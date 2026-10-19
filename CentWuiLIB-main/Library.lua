@@ -1151,7 +1151,7 @@ do
             Parent = ToggleLabel;
         });
         local PickOuterGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
+            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
             Rotation = 0;
             Enabled = true;
             Parent = PickOuter;
@@ -1189,7 +1189,7 @@ do
             Parent = ScreenGui;
         });
         local ModeSelectGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
+            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
             Rotation = 0;
             Enabled = true;
             Parent = ModeSelectOuter;
@@ -3549,7 +3549,7 @@ function Library:CreateWindow(...)
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
         local TabButtonGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
+            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
             Rotation = 0;
             Enabled = true;
             Parent = TabButton;
