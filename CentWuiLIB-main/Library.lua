@@ -1,4 +1,3 @@
--- ///////////////////////////////////////////////////////////
 -- // CentWuiLib — a cooler LinoriaLib fork
 -- // Based on LinoriaLib by Inori / Wally / Stefanuk
 -- // What's new in CentWuiLib:
@@ -7,11 +6,7 @@
 -- //  • Decal transparency / size / tint control per corner
 -- //  • Background gradient (Sideways/Downways): Window:SetBackgroundGradient()
 -- //  • Full-background decals with transparency: Window:SetBackgroundDecal()
--- //  • Cleaner watermarks, notifications & keybind list styling
--- // Usage:
--- //   local CentWui = loadstring(game:HttpGet('YOUR_REPO/Library.lua'))()
--- //   local Window = CentWui:CreateWindow({ Title = 'CentWui', CornerDecals = {...} })
--- //   Window:SetCornerDecal('TopRight', 12345678, 0.15)
+-- //  • Sigma gradients applied by default everywhere (sliders, highlights, accents)
 -- ///////////////////////////////////////////////////////////
 
 local InputService = game:GetService('UserInputService');
@@ -45,7 +40,6 @@ local Library = {
 
     HudRegistry = {};
 
-    -- CentWui signature look: purple base, pixel font
     FontColor = Color3.fromRGB(240, 235, 255);
     MainColor = Color3.fromRGB(46, 24, 86);
     BackgroundColor = Color3.fromRGB(26, 12, 54);
@@ -61,17 +55,17 @@ local Library = {
     Black = Color3.new(0, 0, 0);
     Font = Enum.Font.Code,
 
-    CornerDecals = {}; -- [Window] = { TopLeft = {...}, TopRight = {...}, ... }
-    BackgroundDecals = {}; -- [Window] = ImageLabel (full-window background art)
+    CornerDecals = {};
+    BackgroundDecals = {};
 
-    DefaultGradientDirection = 'Downways'; -- 'Sideways' (0 deg) or 'Downways' (90 deg)
+    DefaultGradientDirection = 'Downways';
 
     OpenedFrames = {};
     DependencyBoxes = {};
 
     Signals = {};
     ScreenGui = ScreenGui;
-    CentWuiVersion = '1.1.1';
+    CentWuiVersion = '1.1.2';
 };
 
 local RainbowStep = 0
@@ -585,6 +579,7 @@ do
             ZIndex = 17;
             Parent = PickerFrameInner;
         });
+        Library:ApplyAccentGradient(Highlight, 0);
 
         local SatVibMapOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
@@ -888,7 +883,6 @@ do
         end
 
         Library:AddToRegistry(PickerFrameInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
-        Library:AddToRegistry(Highlight, { BackgroundColor3 = 'AccentColor'; });
         Library:AddToRegistry(SatVibMapInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
         Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'MainColor'; BorderColor3 = 'OutlineColor'; });
@@ -1948,6 +1942,16 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
+        local ToggleInnerGradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library.AccentColor),
+                ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor)
+            });
+            Rotation = 0;
+            Enabled = false;
+            Parent = ToggleInner;
+        });
+
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
             Position = UDim2.new(1, 6, 0, 0);
@@ -1989,6 +1993,7 @@ do
         function Toggle:Display()
             ToggleInner.BackgroundColor3 = Toggle.Value and Library.AccentColor or Library.MainColor;
             ToggleInner.BorderColor3 = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
+            ToggleInnerGradient.Enabled = Toggle.Value;
 
             Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
@@ -2112,6 +2117,7 @@ do
             ZIndex = 7;
             Parent = SliderInner;
         });
+        Library:ApplyAccentGradient(Fill, 0);
 
         Library:AddToRegistry(Fill, {
             BackgroundColor3 = 'AccentColor';
@@ -2126,6 +2132,7 @@ do
             ZIndex = 8;
             Parent = Fill;
         });
+        Library:ApplyAccentGradient(HideBorderRight, 0);
 
         Library:AddToRegistry(HideBorderRight, {
             BackgroundColor3 = 'AccentColor';
@@ -3022,6 +3029,7 @@ function Library:Notify(Text, Time)
         ZIndex = 104;
         Parent = NotifyOuter;
     });
+    Library:ApplyAccentGradient(LeftColor, 90);
 
     Library:AddToRegistry(LeftColor, {
         BackgroundColor3 = 'AccentColor';
@@ -3085,7 +3093,6 @@ function Library:CreateWindow(...)
 
     Library:MakeDraggable(Outer, 25);
 
-    -- Background canvas container for gradients & full-background decals
     local BgCanvas = Library:Create('Frame', {
         Name = 'CentWuiBackground';
         BackgroundColor3 = Library.MainColor;
@@ -3480,7 +3487,10 @@ function Library:CreateWindow(...)
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
         local TabButtonGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library.AccentColor),
+                ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor)
+            });
             Rotation = 0;
             Enabled = true;
             Parent = TabButton;
@@ -3750,6 +3760,7 @@ function Library:CreateWindow(...)
                 ZIndex = 10;
                 Parent = BoxInner;
             });
+            Library:ApplyAccentGradient(Highlight, 0);
 
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
