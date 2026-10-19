@@ -1,10 +1,15 @@
+--!nocheck
 -- CentWuiLib example (Linoria-compatible fork with cooler theme + corner decals)
 -- Live demo: https://github.com/maksimvoovoo-prog/CentWuiLIB/tree/main/CentWuiLIB-main
 local repo = 'https://raw.githubusercontent.com/maksimvoovoo-prog/CentWuiLIB/main/CentWuiLIB-main/'
 
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua?t=' .. tick()))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua?t=' .. tick()))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua?t=' .. tick()))()
+
+-- Library exposes these via getgenv(); declare as locals so type checkers see them
+local Toggles = getgenv().Toggles
+local Options = getgenv().Options
 
 local Window = Library:CreateWindow({
     -- Set Center to true if you want the menu to appear in the center
@@ -65,7 +70,21 @@ local Tabs = {
     Main = Window:AddTab('Main'),
     Crosshair = Window:AddTab('Crosshair'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
-}
+};
+
+-- Show the first tab by default so tab buttons and content are visible immediately
+Tabs.Main:ShowTab();
+
+-- // Example: custom gradient + text background on a tab button //--
+-- Tabs.Main.Gradient.Enabled = true;
+-- Tabs.Main.Gradient.Color = ColorSequence.new({
+--     ColorSequenceKeypoint.new(0, Color3.new(1, 0.2, 0.2)),
+--     ColorSequenceKeypoint.new(0.5, Color3.new(1, 0.8, 0.2)),
+--     ColorSequenceKeypoint.new(1, Color3.new(0.2, 1, 0.2)),
+-- });
+-- Tabs.Main.Gradient.Rotation = 45;
+-- Tabs.Main.TextBackground.BackgroundColor3 = Color3.new(0, 0, 0);
+-- Tabs.Main.TextBackground.BackgroundTransparency = 0.3;
 
 -- // Crosshair demo: cross + dot, every control saves to config. //
 local CrosshairLeft = Tabs.Crosshair:AddLeftGroupbox('Crosshair')
@@ -604,9 +623,10 @@ local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(
         FrameCounter = 0;
     end;
 
-    Library:SetWatermark(('CentWuiLIB demo | %s fps | %s ms'):format(
+    local StatsService = game:GetService('Stats') :: any;
+    Library:SetWatermark(('CentWuiLIB demo | %d fps | %d ms'):format(
         math.floor(FPS),
-        math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())
+        math.floor(StatsService.Network.ServerStatsItem['Data Ping']:GetValue())
     ));
 end);
 
@@ -665,3 +685,5 @@ ThemeManager:ApplyToTab(Tabs['UI Settings'])
 -- You can use the SaveManager:LoadAutoloadConfig() to load a config
 -- which has been marked to be one that auto loads!
 SaveManager:LoadAutoloadConfig()
+
+-- AutoShow = true handles window visibility; do not double-toggle
