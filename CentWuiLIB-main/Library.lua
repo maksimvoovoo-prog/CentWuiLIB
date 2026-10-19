@@ -3454,7 +3454,7 @@ function Library:CreateWindow(...)
 
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
-        BackgroundTransparency = 0.35;
+        BackgroundTransparency = 0.2;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 8, 0, 29);
         Size = UDim2.new(1, -16, 1, -37);
@@ -3469,7 +3469,7 @@ function Library:CreateWindow(...)
 
     local MainSectionInner = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
-        BackgroundTransparency = 0.45;
+        BackgroundTransparency = 0.25;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 0, 0, 0);
         Size = UDim2.new(1, 0, 1, 0);
@@ -3499,11 +3499,11 @@ function Library:CreateWindow(...)
 
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
-        BackgroundTransparency = 0.4;
+        BackgroundTransparency = 0.15;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 8, 0, 30);
         Size = UDim2.new(1, -16, 1, -38);
-        ZIndex = 4;
+        ZIndex = 1;
         Parent = MainSectionInner;
     });
     Library:ApplyCorner(TabContainer, UDim.new(0, 8));
@@ -3645,7 +3645,7 @@ function Library:CreateWindow(...)
 
             local BoxOuter = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
-                BackgroundTransparency = 0.3;
+                BackgroundTransparency = 0.15;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, 0, 0, 507 + 2);
                 ZIndex = 5;
@@ -3659,7 +3659,7 @@ function Library:CreateWindow(...)
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
-                BackgroundTransparency = 0.45;
+                BackgroundTransparency = 0.25;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, -2, 1, -2);
                 Position = UDim2.new(0, 1, 0, 1);
