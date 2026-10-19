@@ -3535,9 +3535,28 @@ function Library:CreateWindow(...)
         });
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
+        local TabButtonGradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor);
+            Rotation = 0;
+            Enabled = false;
+            Parent = TabButton;
+        });
+
         Library:AddToRegistry(TabButton, {
             BackgroundColor3 = 'AccentColor';
         });
+
+        local TabTextBackground = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BackgroundTransparency = 0.5;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 4, 0.5, 0);
+            Size = UDim2.new(1, -8, 0, 16);
+            AnchorPoint = Vector2.new(0, 0.5);
+            ZIndex = 2;
+            Parent = TabButton;
+        });
+        Library:ApplyCorner(TabTextBackground, UDim.new(0, 4));
 
         local TabButtonLabel = Library:CreateLabel({
             Position = UDim2.new(0, 0, 0, 0);
@@ -3547,6 +3566,9 @@ function Library:CreateWindow(...)
             ZIndex = 3;
             Parent = TabButton;
         });
+
+        Tab.Gradient = TabButtonGradient;
+        Tab.TextBackground = TabTextBackground;
 
         local Blocker = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
