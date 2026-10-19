@@ -193,19 +193,25 @@ function Library:ApplyGlow(Inst, Color, Transparency)
     });
 end;
 
+-- Accepted directions: 'Sideways' (left->right), 'Leftways' (right->left),
+-- 'Downways' (top->bottom), 'Upways' (bottom->top) or any number of degrees (0-360).
 function Library:GradientRotationForDirection(Direction)
+    if type(Direction) == 'number' then
+        return Direction % 360;
+    end;
     if type(Direction) ~= 'string' then
         Direction = Library.DefaultGradientDirection;
     end;
-    Direction = Direction:lower();
-    if Direction == 'sideways' or Direction == 'horizontal' or Direction == 'left-right' or Direction == 'leftright' then
-        return 0;
-    end;
-    if Direction == 'downways' or Direction == 'vertical' or Direction == 'top-bottom' or Direction == 'topbottom' then
-        return 90;
-    end;
-    local num = tonumber(Direction);
-    if num then return num % 360; end;
+
+    local D = Direction:lower():gsub('[%s_%-]', '');
+
+    if D == 'sideways' or D == 'horizontal' or D == 'rightways' or D == 'leftright' or D == 'right' then return 0; end;
+    if D == 'downways' or D == 'vertical' or D == 'topbottom' or D == 'down' then return 90; end;
+    if D == 'leftways' or D == 'rightleft' or D == 'left' then return 180; end;
+    if D == 'upways' or D == 'bottomtop' or D == 'up' then return 270; end;
+
+    local Num = tonumber(D);
+    if Num then return Num % 360; end;
     return 90;
 end;
 
@@ -217,7 +223,24 @@ end;
 -- // object itself is painted WHITE and the gradient supplies the colour.
 -- ///////////////////////////////////////////////////////////
 Library.AccentGradients = setmetatable({}, { __mode = 'k' });
-Library.AccentGradientRotation = 0;
+
+-- Default direction of each kind of accent object. Change them from your script:
+--   Library:SetGradientDirection('Toggle', 'Downways')
+--   Library:SetGradientDirection({ Toggle = 'Upways', Slider = 'Leftways' })
+-- or pass  GradientDirections = { ... }  to CreateWindow.
+Library.GradientDirections = {
+    Default = 'Sideways';  -- anything not listed below
+    Toggle  = 'Upways';    -- checkboxes
+    Slider  = 'Sideways';  -- slider fills
+    Line    = 'Sideways';  -- accent lines (window header, groupboxes, tabboxes, watermark, keybind list, color picker)
+    Tab     = 'Sideways';  -- tab buttons
+    Picker  = 'Sideways';  -- keybind picker outlines
+    Notify  = 'Downways';  -- notification side bar
+    Text    = 'Sideways';  -- accent coloured text
+    Glow    = 45;          -- window outline glow
+};
+Library.GradientCategoryOf = setmetatable({}, { __mode = 'k' });
+Library.GradientOverrides  = setmetatable({}, { __mode = 'k' });
 
 local PaintableProps = {
     BackgroundColor3 = true;
@@ -245,20 +268,70 @@ function Library:IsPaintable(Inst, Property)
     return Property == 'Color' and Inst:IsA('UIStroke');
 end;
 
+function Library:SetGradientCategory(Inst, Category)
+    Library.GradientCategoryOf[Inst] = Category;
+end;
+
+-- which rotation should this instance's gradient use right now?
+function Library:GetGradientRotation(Inst, Property)
+    local Dir = Library.GradientOverrides[Inst];
+
+    if Dir == nil then
+        local Cat = Library.GradientCategoryOf[Inst];
+        if not Cat then
+            Cat = (Property == 'TextColor3' and 'Text') or (Property == 'Color' and 'Glow') or 'Default';
+        end;
+        Dir = Library.GradientDirections[Cat] or Library.GradientDirections.Default;
+    end;
+
+    return Library:GradientRotationForDirection(Dir);
+end;
+
+local ACCENT_PREFIX = 'CentWuiAccent_';
+
+function Library:RefreshGradientDirections()
+    for Grad in next, Library.AccentGradients do
+        local Owner = Grad.Parent;
+        if Owner then
+            Grad.Rotation = Library:GetGradientRotation(Owner, Grad.Name:sub(#ACCENT_PREFIX + 1));
+        else
+            Library.AccentGradients[Grad] = nil;
+        end;
+    end;
+end;
+
+-- Library:SetGradientDirection('Toggle', 'Upways')  or  Library:SetGradientDirection({ Toggle = 'Upways', ... })
+function Library:SetGradientDirection(Category, Direction)
+    if type(Category) == 'table' then
+        for Cat, Dir in next, Category do
+            Library.GradientDirections[Cat] = Dir;
+        end;
+    else
+        Library.GradientDirections[Category] = Direction;
+    end;
+    Library:RefreshGradientDirections();
+    Library:UpdateColorsUsingRegistry();
+end;
+
+-- change ONE object only (Direction = nil goes back to its category default)
+function Library:SetObjectGradientDirection(Inst, Direction)
+    Library.GradientOverrides[Inst] = Direction;
+    Library:RefreshGradientDirections();
+    Library:UpdateColorsUsingRegistry();
+end;
+
 -- turn the accent gradient on/off for ONE property of ONE instance
-function Library:SetAccentPaint(Inst, Property, Enabled, Rotation)
-    local Name = 'CentWuiAccent_' .. Property;
+function Library:SetAccentPaint(Inst, Property, Enabled)
+    local Name = ACCENT_PREFIX .. Property;
     local Grad = Inst:FindFirstChild(Name);
 
     if Enabled then
         if not Grad then
             Grad = Library:Create('UIGradient', {
                 Name = Name;
-                Rotation = Rotation or Library.AccentGradientRotation;
+                Rotation = Library:GetGradientRotation(Inst, Property);
                 Parent = Inst;
             });
-        elseif Rotation then
-            Grad.Rotation = Rotation;
         end;
 
         Grad.Color = Library:GetAccentSequence();
@@ -272,13 +345,16 @@ function Library:SetAccentPaint(Inst, Property, Enabled, Rotation)
     return Grad;
 end;
 
--- kept for compatibility with the old API
-function Library:ApplyAccentGradient(Inst, Rotation)
-    if type(Rotation) == 'string' then
-        Rotation = Library:GradientRotationForDirection(Rotation);
+-- Direction can be a category name ('Line', 'Slider', ...), a direction ('Upways') or degrees
+function Library:ApplyAccentGradient(Inst, Direction)
+    if type(Direction) == 'string' and Library.GradientDirections[Direction] ~= nil then
+        Library:SetGradientCategory(Inst, Direction);
+    elseif Direction ~= nil then
+        Library.GradientOverrides[Inst] = Direction;
     end;
+
     local Prop = Inst:IsA('UIStroke') and 'Color' or 'BackgroundColor3';
-    return Library:SetAccentPaint(Inst, Prop, true, Rotation or 90);
+    return Library:SetAccentPaint(Inst, Prop, true);
 end;
 
 function Library:ResolveColor(ColorIdx)
@@ -294,7 +370,7 @@ end;
 function Library:SetColor(Inst, Property, ColorIdx)
     if Library:IsPaintable(Inst, Property) then
         if ColorIdx == 'AccentColor' then
-            Library:SetAccentPaint(Inst, Property, true, Property == 'Color' and 45 or nil);
+            Library:SetAccentPaint(Inst, Property, true);
             return;
         end;
         Library:SetAccentPaint(Inst, Property, false);
@@ -674,7 +750,7 @@ do
             ZIndex = 17;
             Parent = PickerFrameInner;
         });
-        Library:ApplyAccentGradient(Highlight, 0);
+        Library:ApplyAccentGradient(Highlight, 'Line');
 
         local SatVibMapOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
@@ -1212,7 +1288,7 @@ do
             ZIndex = 6;
             Parent = ToggleLabel;
         });
-        Library:ApplyAccentGradient(PickOuter, 0);
+        Library:ApplyAccentGradient(PickOuter, 'Picker');
 
         local PickInner = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1245,7 +1321,7 @@ do
             ZIndex = 14;
             Parent = ScreenGui;
         });
-        Library:ApplyAccentGradient(ModeSelectOuter, 0);
+        Library:ApplyAccentGradient(ModeSelectOuter, 'Picker');
 
         ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
             ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
@@ -2027,6 +2103,10 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
+        -- gradient direction: Library.GradientDirections.Toggle, or Info.GradientDirection for this one
+        Library:SetGradientCategory(ToggleInner, 'Toggle');
+        Library.GradientOverrides[ToggleInner] = Info.GradientDirection;
+
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
             Position = UDim2.new(1, 6, 0, 0);
@@ -2059,6 +2139,10 @@ do
 
         function Toggle:UpdateColors()
             Toggle:Display();
+        end;
+
+        function Toggle:SetGradientDirection(Direction)
+            Library:SetObjectGradientDirection(ToggleInner, Direction);
         end;
 
         if type(Info.Tooltip) == 'string' then
@@ -2191,12 +2275,18 @@ do
             ZIndex = 7;
             Parent = SliderInner;
         });
-        Library:ApplyAccentGradient(Fill, 0);
+        Library:ApplyAccentGradient(Fill, 'Slider');
 
         Library:AddToRegistry(Fill, {
             BackgroundColor3 = 'AccentColor';
             BorderColor3 = 'AccentColorDark';
         });
+
+        -- gradient direction: Library.GradientDirections.Slider, or Info.GradientDirection for this one
+        if Info.GradientDirection ~= nil then
+            Library.GradientOverrides[Fill] = Info.GradientDirection;
+            Library:RefreshGradientDirections();
+        end;
 
         local HideBorderRight = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor2 or Library.AccentColor;
@@ -2208,7 +2298,14 @@ do
         });
         -- sits on the right edge of the fill, so it must match the END of the gradient
         Library:AddToRegistry(HideBorderRight, {
-            BackgroundColor3 = function() return Library.AccentColor2 or Library.AccentColor; end;
+            BackgroundColor3 = function()
+                -- colour of the fill's right edge for the current direction
+                local Rot = Library:GetGradientRotation(Fill, 'BackgroundColor3');
+                local A, B = Library.AccentColor, Library.AccentColor2 or Library.AccentColor;
+                if Rot == 0 then return B; end;
+                if Rot == 180 then return A; end;
+                return A:Lerp(B, 0.5);
+            end;
         });
 
         local DisplayLabel = Library:CreateLabel({
@@ -2227,6 +2324,10 @@ do
         if type(Info.Tooltip) == 'string' then
             Library:AddToolTip(Info.Tooltip, SliderOuter)
         end
+
+        function Slider:SetGradientDirection(Direction)
+            Library:SetObjectGradientDirection(Fill, Direction);
+        end;
 
         function Slider:UpdateColors()
             Library:SetColor(Fill, 'BackgroundColor3', 'AccentColor');
@@ -2909,7 +3010,7 @@ do
         Parent = WatermarkInner;
     });
     Library:ApplyCorner(TopAccent, UDim.new(1, 0));
-    Library:ApplyAccentGradient(TopAccent, 0);
+    Library:ApplyAccentGradient(TopAccent, 'Line');
 
     local Gradient = Library:Create('UIGradient', {
         Color = ColorSequence.new({
@@ -2976,7 +3077,7 @@ do
         Parent = KeybindInner;
     });
     Library:ApplyCorner(ColorFrame, UDim.new(1, 0));
-    Library:ApplyAccentGradient(ColorFrame, 0);
+    Library:ApplyAccentGradient(ColorFrame, 'Line');
 
     Library:AddToRegistry(ColorFrame, {
         BackgroundColor3 = 'AccentColor';
@@ -3102,7 +3203,7 @@ function Library:Notify(Text, Time)
         ZIndex = 104;
         Parent = NotifyOuter;
     });
-    Library:ApplyAccentGradient(LeftColor, 90);
+    Library:ApplyAccentGradient(LeftColor, 'Notify');
 
     Library:AddToRegistry(LeftColor, {
         BackgroundColor3 = 'AccentColor';
@@ -3134,6 +3235,11 @@ function Library:CreateWindow(...)
 
     if type(Config.Title) ~= 'string' then Config.Title = 'No title' end
     if type(Config.TabPadding) ~= 'number' then Config.TabPadding = 8 end
+    if type(Config.GradientDirections) == 'table' then
+        for Cat, Dir in next, Config.GradientDirections do
+            Library.GradientDirections[Cat] = Dir;
+        end;
+    end;
     if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = 0.2 end
     if typeof(Config.CornerRadius) ~= 'UDim' then Config.CornerRadius = Library.CornerRadius end
 
@@ -3216,7 +3322,7 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
     Library:ApplyCorner(HeaderAccent, UDim.new(1, 0));
-    Library:ApplyAccentGradient(HeaderAccent, 0);
+    Library:ApplyAccentGradient(HeaderAccent, 'Line');
 
     local DecalLayer = Library:Create('Frame', {
         Name = 'CentWuiDecals';
@@ -3560,7 +3666,7 @@ function Library:CreateWindow(...)
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
         -- active tab: white * gradient = full gradient, inactive tab: grey * gradient = dimmed gradient
-        local TabButtonGradient = Library:ApplyAccentGradient(TabButton, 0);
+        local TabButtonGradient = Library:ApplyAccentGradient(TabButton, 'Tab');
 
         local TabTextBackground = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -3720,7 +3826,7 @@ function Library:CreateWindow(...)
                 Parent = BoxInner;
             });
             Library:ApplyCorner(Highlight, UDim.new(1, 0));
-            Library:ApplyAccentGradient(Highlight, 0);
+            Library:ApplyAccentGradient(Highlight, 'Line');
 
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
@@ -3820,7 +3926,7 @@ function Library:CreateWindow(...)
                 ZIndex = 10;
                 Parent = BoxInner;
             });
-            Library:ApplyAccentGradient(Highlight, 0);
+            Library:ApplyAccentGradient(Highlight, 'Line');
 
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
