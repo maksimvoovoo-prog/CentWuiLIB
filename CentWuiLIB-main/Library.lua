@@ -3526,17 +3526,18 @@ function Library:CreateWindow(...)
         local TabButtonWidth = Library:GetTextBounds(Name, Library.Font, 16);
 
         local TabButton = Library:Create('Frame', {
-            BackgroundColor3 = Library.OutlineColor;
+            BackgroundColor3 = Library.AccentColor;
+            BackgroundTransparency = 0;
             BorderSizePixel = 1;
             BorderColor3 = Library.OutlineColor;
-            Size = UDim2.new(0, TabButtonWidth + 8 + 4, 1, 0);
-            ZIndex = 1;
+            Size = UDim2.new(0, math.max(TabButtonWidth + 8 + 4, 60), 1, 0);
+            ZIndex = 2;
             Parent = TabArea;
         });
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
         Library:AddToRegistry(TabButton, {
-            BackgroundColor3 = 'OutlineColor';
+            BackgroundColor3 = 'AccentColor';
         });
 
         local TabButtonLabel = Library:CreateLabel({
@@ -3625,15 +3626,15 @@ function Library:CreateWindow(...)
             end;
 
             Blocker.BackgroundTransparency = 0;
-            TabButton.BackgroundColor3 = Library.AccentColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'AccentColor';
+            TabButton.BackgroundColor3 = Color3.new(1, 1, 1);
+            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = nil;
             TabFrame.Visible = true;
         end;
 
         function Tab:HideTab()
             Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Library.OutlineColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'OutlineColor';
+            TabButton.BackgroundColor3 = Library.AccentColor;
+            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'AccentColor';
             TabFrame.Visible = false;
         end;
 
