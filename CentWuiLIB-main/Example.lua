@@ -1,7 +1,6 @@
 -- CentWuiLib example (Linoria-compatible fork with cooler theme + corner decals)
--- Replace the repo URL with your fork, e.g. 'https://raw.githubusercontent.com/YOUR_USER/CentWuiLib/main/'
-
-local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+-- Live demo: https://github.com/maksimvoovoo-prog/CentWuiLIB/tree/main/CentWuiLIB-main
+local repo = 'https://raw.githubusercontent.com/maksimvoovoo-prog/CentWuiLIB/main/CentWuiLIB-main/'
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
@@ -13,25 +12,32 @@ local Window = Library:CreateWindow({
     -- Position and Size are also valid options here
     -- but you do not need to define them unless you are changing them :)
 
-    Title = 'Example menu',
+    Title = 'CentWuiLIB demo',
     Center = true,
     AutoShow = true,
     TabPadding = 8,
     MenuFadeTime = 0.2,
 
-    -- CentWuiLib only: put a different decal on any window corner just with its ID.
-    -- Corners: 'TopLeft' | 'TopRight' | 'BottomLeft' | 'BottomRight' (or 'TL'/'TR'/'BL'/'BR')
-    -- CornerDecals = {
-    --     TopRight = 12345678, -- plain asset ID also works as "12345678" or "rbxassetid://12345678"
-    --     BottomLeft = { Asset = 87654321, Transparency = 0.15, Size = 56 },
-    -- },
-    -- CornerDecalSize = 48,   -- default square size in px (16..256)
-    -- CornerTransparency = 0, -- default ImageTransparency 0..1
+    -- Background: purple -> lighter purple, top-down (Downways), behind ALL options
+    BackgroundGradient = 'Downways',
+    BackgroundGradientColors = {
+        Color3.fromRGB(88, 40, 180),    -- top: rich purple
+        Color3.fromRGB(190, 150, 255),  -- bottom: lighter purple
+    },
 
-    -- CentWuiLib only: background gradient + full-window background decal.
-    -- BackgroundGradient = 'Sideways', -- 'Sideways' (left->right) or 'Downways' (top->bottom), or 0-360
-    -- BackgroundDecal = 11223344,      -- asset ID, or { Asset = 11223344, Transparency = 0.85 }
-    -- BackgroundTransparency = 0.85,
+    -- Background decal: asset 7710824618 behind everything, half transparent (0.5)
+    BackgroundDecal = { Asset = 7710824618, Transparency = 0.5 },
+    BackgroundTransparency = 0.5,
+
+    -- Corner decals: same asset 7710824618 on all 4 corners, half transparent
+    CornerDecals = {
+        TopLeft = { Asset = 7710824618, Transparency = 0.5, Size = 56 },
+        TopRight = { Asset = 7710824618, Transparency = 0.5, Size = 56 },
+        BottomLeft = { Asset = 7710824618, Transparency = 0.5, Size = 56 },
+        BottomRight = { Asset = 7710824618, Transparency = 0.5, Size = 56 },
+    },
+    CornerDecalSize = 56,
+    CornerTransparency = 0.5,
 })
 
 -- CentWuiLib corner-decal API (run any time after CreateWindow):
@@ -56,10 +62,181 @@ local Window = Library:CreateWindow({
 
 -- You do not have to set your tabs & groups up this way, just a prefrence.
 local Tabs = {
-    -- Creates a new tab titled Main
     Main = Window:AddTab('Main'),
+    Crosshair = Window:AddTab('Crosshair'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
+
+-- // Crosshair demo: cross + dot, every control saves to config. //
+local CrosshairLeft = Tabs.Crosshair:AddLeftGroupbox('Crosshair')
+local CrosshairRight = Tabs.Crosshair:AddRightGroupbox('Preview & Style')
+
+CrosshairLeft:AddToggle('CrosshairEnabled', {
+    Text = 'Enable crosshair',
+    Default = true,
+})
+
+CrosshairLeft:AddToggle('CrosshairDot', {
+    Text = 'Center dot',
+    Default = true,
+})
+
+CrosshairLeft:AddSlider('CrosshairSize', {
+    Text = 'Cross size',
+    Default = 12,
+    Min = 2,
+    Max = 40,
+    Rounding = 0,
+    Suffix = 'px',
+})
+
+CrosshairLeft:AddSlider('CrosshairGap', {
+    Text = 'Cross gap',
+    Default = 4,
+    Min = 0,
+    Max = 20,
+    Rounding = 0,
+    Suffix = 'px',
+})
+
+CrosshairLeft:AddSlider('CrosshairThickness', {
+    Text = 'Line thickness',
+    Default = 2,
+    Min = 1,
+    Max = 6,
+    Rounding = 0,
+    Suffix = 'px',
+})
+
+CrosshairLeft:AddSlider('CrosshairDotSize', {
+    Text = 'Dot size',
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Suffix = 'px',
+})
+
+CrosshairRight:AddLabel('Crosshair color'):AddColorPicker('CrosshairColor', {
+    Default = Color3.fromRGB(178, 132, 255),
+    Title = 'Crosshair color',
+})
+
+CrosshairRight:AddSlider('CrosshairTransparency', {
+    Text = 'Transparency',
+    Default = 0,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Suffix = '%',
+})
+
+CrosshairRight:AddDropdown('CrosshairStyle', {
+    Values = { 'Cross + Dot', 'Cross only', 'Dot only' },
+    Default = 1,
+    Multi = false,
+    Text = 'Style preset',
+})
+
+CrosshairRight:AddButton({
+    Text = 'Reset crosshair',
+    Func = function()
+        Toggles.CrosshairEnabled:SetValue(true)
+        Toggles.CrosshairDot:SetValue(true)
+        Options.CrosshairSize:SetValue(12)
+        Options.CrosshairGap:SetValue(4)
+        Options.CrosshairThickness:SetValue(2)
+        Options.CrosshairDotSize:SetValue(3)
+        Options.CrosshairTransparency:SetValue(0)
+        Options.CrosshairStyle:SetValue('Cross + Dot')
+        Library:Notify('Crosshair reset to defaults', 3)
+    end,
+})
+
+CrosshairLeft:AddButton({
+    Text = 'Use: Cross only',
+    Func = function() Options.CrosshairStyle:SetValue('Cross only') end,
+})
+
+CrosshairLeft:AddButton({
+    Text = 'Use: Dot only',
+    Func = function() Options.CrosshairStyle:SetValue('Dot only') end,
+})
+
+-- Live crosshair overlay (Drawing API). All controls above save via SaveManager.
+local CrosshairDraw = { Lines = {}, Dot = nil }
+
+local function CrosshairState()
+    local style = 'Cross + Dot'
+    if Options.CrosshairStyle and type(Options.CrosshairStyle.Value) == 'string' then
+        style = Options.CrosshairStyle.Value
+    end
+    return {
+        Enabled = Toggles.CrosshairEnabled and Toggles.CrosshairEnabled.Value,
+        Dot = Toggles.CrosshairDot and Toggles.CrosshairDot.Value,
+        Size = Options.CrosshairSize.Value,
+        Gap = Options.CrosshairGap.Value,
+        Thick = Options.CrosshairThickness.Value,
+        DotSize = Options.CrosshairDotSize.Value,
+        Color = Options.CrosshairColor.Value,
+        Trans = Options.CrosshairTransparency.Value / 100,
+        Style = style,
+    }
+end
+
+local function UpdateCrosshair()
+    local ok = pcall(function()
+        if #CrosshairDraw.Lines == 0 then
+            for _ = 1, 4 do
+                local line = Drawing.new('Line')
+                line.Visible = false
+                table.insert(CrosshairDraw.Lines, line)
+            end
+            local dot = Drawing.new('Circle')
+            dot.Filled = true
+            dot.Visible = false
+            CrosshairDraw.Dot = dot
+        end
+    end)
+    if not ok then return end
+
+    local s = CrosshairState()
+    local showCross = s.Enabled and (s.Style ~= 'Dot only')
+    local showDot = s.Enabled and s.Dot and (s.Style ~= 'Cross only')
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+
+    local segs = {
+        { c + Vector2.new(s.Gap, 0), c + Vector2.new(s.Gap + s.Size, 0) },
+        { c - Vector2.new(s.Gap, 0), c - Vector2.new(s.Gap + s.Size, 0) },
+        { c + Vector2.new(0, s.Gap), c + Vector2.new(0, s.Gap + s.Size) },
+        { c - Vector2.new(0, s.Gap), c - Vector2.new(0, s.Gap + s.Size) },
+    }
+
+    for i, line in ipairs(CrosshairDraw.Lines) do
+        line.Visible = showCross
+        if showCross then
+            line.From = segs[i][1]
+            line.To = segs[i][2]
+            line.Color = s.Color
+            line.Thickness = s.Thick
+            line.Transparency = 1 - s.Trans
+        end
+    end
+
+    CrosshairDraw.Dot.Visible = showDot
+    if showDot then
+        CrosshairDraw.Dot.Position = c
+        CrosshairDraw.Dot.Radius = s.DotSize
+        CrosshairDraw.Dot.Color = s.Color
+        CrosshairDraw.Dot.Transparency = 1 - s.Trans
+    end
+end
+
+pcall(function()
+    game:GetService('RunService').RenderStepped:Connect(UpdateCrosshair)
+end)
 
 -- Groupbox and Tabbox inherit the same functions
 -- except Tabboxes you have to call the functions on a tab (Tabbox:AddTab(name))
@@ -427,7 +604,7 @@ local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(
         FrameCounter = 0;
     end;
 
-    Library:SetWatermark(('LinoriaLib demo | %s fps | %s ms'):format(
+    Library:SetWatermark(('CentWuiLIB demo | %s fps | %s ms'):format(
         math.floor(FPS),
         math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())
     ));
@@ -437,6 +614,11 @@ Library.KeybindFrame.Visible = true; -- todo: add a function for this
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
+
+    pcall(function()
+        for _, l in ipairs(CrosshairDraw.Lines) do l:Remove() end
+        if CrosshairDraw.Dot then CrosshairDraw.Dot:Remove() end
+    end)
 
     print('Unloaded!')
     Library.Unloaded = true
