@@ -1,4 +1,3 @@
-
 -- ///////////////////////////////////////////////////////////
 -- // CentWuiLib — a cooler LinoriaLib fork
 -- // Based on LinoriaLib by Inori / Wally / Stefanuk
@@ -3544,7 +3543,8 @@ function Library:CreateWindow(...)
             Position = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, -1);
             Text = Name;
-            ZIndex = 1;
+            TextColor3 = Color3.new(1, 1, 1);
+            ZIndex = 3;
             Parent = TabButton;
         });
 
