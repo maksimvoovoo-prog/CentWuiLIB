@@ -45,13 +45,13 @@ local Library = {
 
     HudRegistry = {};
 
-    -- CentWui signature look: deep dark + violet/cyan accents
-    FontColor = Color3.fromRGB(235, 238, 255);
-    MainColor = Color3.fromRGB(22, 22, 32);
-    BackgroundColor = Color3.fromRGB(13, 13, 20);
-    AccentColor = Color3.fromRGB(124, 92, 255);
-    AccentColor2 = Color3.fromRGB(64, 224, 255);
-    OutlineColor = Color3.fromRGB(42, 42, 60);
+    -- CentWui signature look: purple base, pixel font
+    FontColor = Color3.fromRGB(240, 235, 255);
+    MainColor = Color3.fromRGB(46, 24, 86);
+    BackgroundColor = Color3.fromRGB(26, 12, 54);
+    AccentColor = Color3.fromRGB(168, 110, 255);
+    AccentColor2 = Color3.fromRGB(110, 200, 255);
+    OutlineColor = Color3.fromRGB(88, 52, 150);
     RiskColor = Color3.fromRGB(255, 85, 110),
 
     CornerRadius = UDim.new(0, 10);
@@ -59,7 +59,7 @@ local Library = {
     TitleGradientEnabled = true;
 
     Black = Color3.new(0, 0, 0);
-    Font = Enum.Font.GothamBold,
+    Font = Enum.Font.Code,
 
     CornerDecals = {}; -- [Window] = { TopLeft = {...}, TopRight = {...}, ... }
     BackgroundDecals = {}; -- [Window] = ImageLabel (full-window background art)
@@ -3118,12 +3118,30 @@ function Library:CreateWindow(...)
 
     Library:MakeDraggable(Outer, 25);
 
-    local Inner = Library:Create('Frame', {
+    -- Background canvas: gradient + bg decal live HERE, behind everything.
+    -- Content panels above it are semi-transparent so art shows through.
+    local BgCanvas = Library:Create('Frame', {
+        Name = 'CentWuiBackground';
         BackgroundColor3 = Library.MainColor;
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 1;
+        Parent = Outer;
+    });
+    Library:ApplyCorner(BgCanvas, Config.CornerRadius);
+
+    Library:AddToRegistry(BgCanvas, {
+        BackgroundColor3 = 'MainColor';
+    });
+
+    local Inner = Library:Create('Frame', {
+        Name = 'CentWuiContent';
+        BackgroundColor3 = Library.MainColor;
+        BackgroundTransparency = 0.25;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
-        ZIndex = 1;
+        ZIndex = 2;
         Parent = Outer;
     });
     Library:ApplyCorner(Inner, Config.CornerRadius);
@@ -3298,7 +3316,7 @@ function Library:CreateWindow(...)
         if not BackgroundGradient then
             BackgroundGradient = Library:Create('UIGradient', {
                 Rotation = Rotation;
-                Parent = Inner;
+                Parent = BgCanvas;
             });
             BackgroundGradient:SetAttribute('CentWuiBackgroundGradient', true);
         else
@@ -3361,13 +3379,13 @@ function Library:CreateWindow(...)
 
         if not BackgroundDecal then
             BackgroundDecal = Library:Create('ImageLabel', {
-                Name = 'CentWuiBackground';
+                Name = 'CentWuiBackgroundArt';
                 BackgroundTransparency = 1;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, 0, 1, 0);
                 ScaleType = Enum.ScaleType.Crop;
                 ZIndex = 1;
-                Parent = Inner;
+                Parent = BgCanvas;
             });
             BackgroundDecal:SetAttribute('CentWuiDecal', true);
             BackgroundDecal:SetAttribute('CentWuiBackground', true);
@@ -3436,10 +3454,11 @@ function Library:CreateWindow(...)
 
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
+        BackgroundTransparency = 0.35;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 8, 0, 29);
         Size = UDim2.new(1, -16, 1, -37);
-        ZIndex = 1;
+        ZIndex = 3;
         Parent = Inner;
     });
     Library:ApplyCorner(MainSectionOuter, UDim.new(0, 8));
@@ -3450,10 +3469,11 @@ function Library:CreateWindow(...)
 
     local MainSectionInner = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
+        BackgroundTransparency = 0.45;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 0, 0, 0);
         Size = UDim2.new(1, 0, 1, 0);
-        ZIndex = 1;
+        ZIndex = 3;
         Parent = MainSectionOuter;
     });
     Library:ApplyCorner(MainSectionInner, UDim.new(0, 8));
@@ -3479,10 +3499,11 @@ function Library:CreateWindow(...)
 
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
+        BackgroundTransparency = 0.4;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 8, 0, 30);
         Size = UDim2.new(1, -16, 1, -38);
-        ZIndex = 2;
+        ZIndex = 4;
         Parent = MainSectionInner;
     });
     Library:ApplyCorner(TabContainer, UDim.new(0, 8));
@@ -3624,9 +3645,10 @@ function Library:CreateWindow(...)
 
             local BoxOuter = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
+                BackgroundTransparency = 0.3;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, 0, 0, 507 + 2);
-                ZIndex = 2;
+                ZIndex = 5;
                 Parent = Info.Side == 1 and LeftSide or RightSide;
             });
             Library:ApplyCorner(BoxOuter, UDim.new(0, 8));
@@ -3637,10 +3659,11 @@ function Library:CreateWindow(...)
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
+                BackgroundTransparency = 0.45;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, -2, 1, -2);
                 Position = UDim2.new(0, 1, 0, 1);
-                ZIndex = 4;
+                ZIndex = 5;
                 Parent = BoxOuter;
             });
             Library:ApplyCorner(BoxInner, UDim.new(0, 8));
