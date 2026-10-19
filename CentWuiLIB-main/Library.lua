@@ -209,19 +209,98 @@ function Library:GradientRotationForDirection(Direction)
     return 90;
 end;
 
+-- ///////////////////////////////////////////////////////////
+-- // ACCENT GRADIENT CORE
+-- // Every "accent" colour in the UI goes through here, so it becomes
+-- // AccentColor -> AccentColor2 and follows theme changes automatically.
+-- // NOTE: a UIGradient MULTIPLIES with the object's own colour, so the
+-- // object itself is painted WHITE and the gradient supplies the colour.
+-- ///////////////////////////////////////////////////////////
+Library.AccentGradients = setmetatable({}, { __mode = 'k' });
+Library.AccentGradientRotation = 0;
+
+local PaintableProps = {
+    BackgroundColor3 = true;
+    TextColor3 = true;
+    ImageColor3 = true;
+};
+
+function Library:GetAccentSequence()
+    return ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Library.AccentColor);
+        ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor);
+    });
+end;
+
+function Library:SetAccentColors(Color1, Color2)
+    if Color1 then Library.AccentColor = Color1; end;
+    if Color2 then Library.AccentColor2 = Color2; end;
+    Library:UpdateColorsUsingRegistry();
+end;
+
+function Library:IsPaintable(Inst, Property)
+    if PaintableProps[Property] and Inst:IsA('GuiObject') then
+        return true;
+    end;
+    return Property == 'Color' and Inst:IsA('UIStroke');
+end;
+
+-- turn the accent gradient on/off for ONE property of ONE instance
+function Library:SetAccentPaint(Inst, Property, Enabled, Rotation)
+    local Name = 'CentWuiAccent_' .. Property;
+    local Grad = Inst:FindFirstChild(Name);
+
+    if Enabled then
+        if not Grad then
+            Grad = Library:Create('UIGradient', {
+                Name = Name;
+                Rotation = Rotation or Library.AccentGradientRotation;
+                Parent = Inst;
+            });
+        elseif Rotation then
+            Grad.Rotation = Rotation;
+        end;
+
+        Grad.Color = Library:GetAccentSequence();
+        Grad.Enabled = true;
+        Library.AccentGradients[Grad] = true;
+        Inst[Property] = Color3.new(1, 1, 1);
+    elseif Grad then
+        Grad.Enabled = false;
+    end;
+
+    return Grad;
+end;
+
+-- kept for compatibility with the old API
 function Library:ApplyAccentGradient(Inst, Rotation)
     if type(Rotation) == 'string' then
         Rotation = Library:GradientRotationForDirection(Rotation);
     end;
-    local grad = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library.AccentColor);
-            ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor);
-        });
-        Rotation = Rotation or 90;
-        Parent = Inst;
-    });
-    return grad;
+    local Prop = Inst:IsA('UIStroke') and 'Color' or 'BackgroundColor3';
+    return Library:SetAccentPaint(Inst, Prop, true, Rotation or 90);
+end;
+
+function Library:ResolveColor(ColorIdx)
+    if type(ColorIdx) == 'string' and Library[ColorIdx] ~= nil then
+        return Library[ColorIdx];
+    elseif type(ColorIdx) == 'function' then
+        return ColorIdx();
+    end;
+    return ColorIdx;
+end;
+
+-- use this instead of  Inst.Prop = Library.AccentColor
+function Library:SetColor(Inst, Property, ColorIdx)
+    if Library:IsPaintable(Inst, Property) then
+        if ColorIdx == 'AccentColor' then
+            Library:SetAccentPaint(Inst, Property, true, Property == 'Color' and 45 or nil);
+            return;
+        end;
+        Library:SetAccentPaint(Inst, Property, false);
+    end;
+
+    Inst[Property] = Library:ResolveColor(ColorIdx);
 end;
 
 function Library:Create(Class, Properties)
@@ -359,7 +438,7 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
         local Reg = Library.RegistryMap[Instance];
 
         for Property, ColorIdx in next, Properties do
-            Instance[Property] = Library[ColorIdx] or ColorIdx;
+            Library:SetColor(Instance, Property, ColorIdx);
 
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
@@ -371,7 +450,7 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
         local Reg = Library.RegistryMap[Instance];
 
         for Property, ColorIdx in next, PropertiesDefault do
-            Instance[Property] = Library[ColorIdx] or ColorIdx;
+            Library:SetColor(Instance, Property, ColorIdx);
 
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
@@ -441,6 +520,12 @@ function Library:AddToRegistry(Instance, Properties, IsHud)
     if IsHud then
         table.insert(Library.HudRegistry, Data);
     end;
+
+    for Property, ColorIdx in next, Properties do
+        if ColorIdx == 'AccentColor' then
+            Library:SetColor(Instance, Property, ColorIdx);
+        end;
+    end;
 end;
 
 function Library:RemoveFromRegistry(Instance)
@@ -464,13 +549,23 @@ function Library:RemoveFromRegistry(Instance)
 end;
 
 function Library:UpdateColorsUsingRegistry()
+    Library:RefreshAccentDark();
+
     for Idx, Object in next, Library.Registry do
         for Property, ColorIdx in next, Object.Properties do
-            if type(ColorIdx) == 'string' then
-                Object.Instance[Property] = Library[ColorIdx];
-            elseif type(ColorIdx) == 'function' then
-                Object.Instance[Property] = ColorIdx()
+            if type(ColorIdx) == 'string' or type(ColorIdx) == 'function' then
+                Library:SetColor(Object.Instance, Property, ColorIdx);
             end
+        end;
+    end;
+
+    -- recolour every accent gradient (also the ones that are not in the registry)
+    local Seq = Library:GetAccentSequence();
+    for Grad in next, Library.AccentGradients do
+        if Grad.Parent then
+            Grad.Color = Seq;
+        else
+            Library.AccentGradients[Grad] = nil;
         end;
     end;
 end;
@@ -1117,12 +1212,7 @@ do
             ZIndex = 6;
             Parent = ToggleLabel;
         });
-        local PickOuterGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
-            Rotation = 0;
-            Enabled = true;
-            Parent = PickOuter;
-        });
+        Library:ApplyAccentGradient(PickOuter, 0);
 
         local PickInner = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1155,12 +1245,7 @@ do
             ZIndex = 14;
             Parent = ScreenGui;
         });
-        local ModeSelectGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Color3.new(Library.AccentColor.R * 0.7, Library.AccentColor.G * 0.7, Library.AccentColor.B * 0.7));
-            Rotation = 0;
-            Enabled = true;
-            Parent = ModeSelectOuter;
-        });
+        Library:ApplyAccentGradient(ModeSelectOuter, 0);
 
         ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
             ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
@@ -1217,7 +1302,7 @@ do
 
                 KeyPicker.Mode = Mode;
 
-                Label.TextColor3 = Library.AccentColor;
+                Library:SetColor(Label, 'TextColor3', 'AccentColor');
                 Library.RegistryMap[Label].Properties.TextColor3 = 'AccentColor';
 
                 ModeSelectOuter.Visible = false;
@@ -1226,7 +1311,7 @@ do
             function ModeButton:Deselect()
                 KeyPicker.Mode = nil;
 
-                Label.TextColor3 = Library.FontColor;
+                Library:SetColor(Label, 'TextColor3', 'FontColor');
                 Library.RegistryMap[Label].Properties.TextColor3 = 'FontColor';
             end;
 
@@ -1254,7 +1339,7 @@ do
             ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode);
 
             ContainerLabel.Visible = true;
-            ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
+            Library:SetColor(ContainerLabel, 'TextColor3', State and 'AccentColor' or 'FontColor');
 
             Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
 
@@ -1612,7 +1697,7 @@ do
                     Library:RemoveFromRegistry(Button.Label)
                     Library:AddToRegistry(Button.Label, { TextColor3 = 'AccentColor' })
 
-                    Button.Label.TextColor3 = Library.AccentColor
+                    Library:SetColor(Button.Label, 'TextColor3', 'AccentColor')
                     Button.Label.Text = 'Are you sure?'
                     Button.Locked = true
 
@@ -1621,7 +1706,7 @@ do
                     Library:RemoveFromRegistry(Button.Label)
                     Library:AddToRegistry(Button.Label, { TextColor3 = 'FontColor' })
 
-                    Button.Label.TextColor3 = Library.FontColor
+                    Library:SetColor(Button.Label, 'TextColor3', 'FontColor')
                     Button.Label.Text = Button.Text
                     task.defer(rawset, Button, 'Locked', false)
 
@@ -1942,16 +2027,6 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
-        local ToggleInnerGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library.AccentColor),
-                ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor)
-            });
-            Rotation = 0;
-            Enabled = false;
-            Parent = ToggleInner;
-        });
-
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
             Position = UDim2.new(1, 6, 0, 0);
@@ -1991,9 +2066,8 @@ do
         end
 
         function Toggle:Display()
-            ToggleInner.BackgroundColor3 = Toggle.Value and Library.AccentColor or Library.MainColor;
+            Library:SetColor(ToggleInner, 'BackgroundColor3', Toggle.Value and 'AccentColor' or 'MainColor');
             ToggleInner.BorderColor3 = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
-            ToggleInnerGradient.Enabled = Toggle.Value;
 
             Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
@@ -2125,17 +2199,16 @@ do
         });
 
         local HideBorderRight = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
+            BackgroundColor3 = Library.AccentColor2 or Library.AccentColor;
             BorderSizePixel = 0;
             Position = UDim2.new(1, 0, 0, 0);
             Size = UDim2.new(0, 1, 1, 0);
             ZIndex = 8;
             Parent = Fill;
         });
-        Library:ApplyAccentGradient(HideBorderRight, 0);
-
+        -- sits on the right edge of the fill, so it must match the END of the gradient
         Library:AddToRegistry(HideBorderRight, {
-            BackgroundColor3 = 'AccentColor';
+            BackgroundColor3 = function() return Library.AccentColor2 or Library.AccentColor; end;
         });
 
         local DisplayLabel = Library:CreateLabel({
@@ -2156,7 +2229,7 @@ do
         end
 
         function Slider:UpdateColors()
-            Fill.BackgroundColor3 = Library.AccentColor;
+            Library:SetColor(Fill, 'BackgroundColor3', 'AccentColor');
             Fill.BorderColor3 = Library.AccentColorDark;
         end;
 
@@ -2522,7 +2595,7 @@ do
                         Selected = Dropdown.Value == Value;
                     end;
 
-                    ButtonLabel.TextColor3 = Selected and Library.AccentColor or Library.FontColor;
+                    Library:SetColor(ButtonLabel, 'TextColor3', Selected and 'AccentColor' or 'FontColor');
                     Library.RegistryMap[ButtonLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
                 end;
 
@@ -3089,7 +3162,7 @@ function Library:CreateWindow(...)
     });
     Library:ApplyCorner(Outer, Config.CornerRadius);
     local OuterGlow = Library:ApplyGlow(Outer, Library.AccentColor, Config.GlowTransparency or Library.GlowTransparency);
-    Library:AddToRegistry(OuterGlow, { Color = 'AccentColor' });
+    Library:AddToRegistry(OuterGlow, { Color = 'AccentColor' }); -- auto gradient stroke
 
     Library:MakeDraggable(Outer, 25);
 
@@ -3486,19 +3559,8 @@ function Library:CreateWindow(...)
         });
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
-        local TabButtonGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library.AccentColor),
-                ColorSequenceKeypoint.new(1, Library.AccentColor2 or Library.AccentColor)
-            });
-            Rotation = 0;
-            Enabled = true;
-            Parent = TabButton;
-        });
-
-        Library:AddToRegistry(TabButton, {
-            BackgroundColor3 = 'AccentColor';
-        });
+        -- active tab: white * gradient = full gradient, inactive tab: grey * gradient = dimmed gradient
+        local TabButtonGradient = Library:ApplyAccentGradient(TabButton, 0);
 
         local TabTextBackground = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -3603,14 +3665,12 @@ function Library:CreateWindow(...)
 
             Blocker.BackgroundTransparency = 0;
             TabButton.BackgroundColor3 = Color3.new(1, 1, 1);
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = nil;
             TabFrame.Visible = true;
         end;
 
         function Tab:HideTab()
             Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Library.AccentColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'AccentColor';
+            TabButton.BackgroundColor3 = Color3.fromRGB(150, 150, 150);
             TabFrame.Visible = false;
         end;
 
