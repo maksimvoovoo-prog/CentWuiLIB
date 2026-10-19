@@ -3080,7 +3080,7 @@ function Library:CreateWindow(...)
         Config = ...;
     else
         Config.Title = Arguments[1]
-        Config.AutoShow = Arguments[2] or false;
+        if Arguments[2] ~= nil then Config.AutoShow = Arguments[2] end;
     end
 
     if type(Config.Title) ~= 'string' then Config.Title = 'No title' end
