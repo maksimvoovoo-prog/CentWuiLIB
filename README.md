@@ -1,6 +1,14 @@
+
 # CentWuiLib
-A cooler LinoriaLib fork — modern dark + violet/cyan theme, rounded corners, glow accents,
-and **per-corner window decals by asset ID with transparency/size control**.
+A cooler LinoriaLib fork — purple base, pixel (`Code`) font, rounded corners, glow accents,
+per-corner window decals, directional background gradients, and full-window background art
+rendered **behind all options** (content panels are translucent).
+
+Live repo: https://github.com/maksimvoovoo-prog/CentWuiLIB/tree/main/CentWuiLIB-main
+```lua
+local repo = 'https://raw.githubusercontent.com/maksimvoovoo-prog/CentWuiLIB/main/CentWuiLIB-main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+```
 
 Based on LinoriaLib by Inori / Wally / Stefanuk. Drop-in compatible: `CreateWindow`, tabs,
 groupboxes, toggles, sliders, dropdowns, color pickers, keybinds, ThemeManager & SaveManager
@@ -13,11 +21,12 @@ all work the same.
 * [Theme Manager](addons/ThemeManager.lua)&nbsp;&nbsp;|&nbsp;&nbsp;[Save Manager](addons/SaveManager.lua)
 
 ## What's cooler vs Linoria
-- Modern palette (deep dark `#0d0d14` / `#161620`, violet `#7c5cff` + cyan `#40e0ff` gradients)
+- Purple base palette (`#1a0c36` / `#2e1856`, accent `#a86eff`)
+- Pixel-style `Code` font everywhere
+- Background gradient + background decal rendered **behind all options**
 - Rounded window, groupboxes, tabs, tooltips, notifications, watermark & keybind list
 - Thin gradient accent bars under the title + on groupboxes
 - Subtle violet glow stroke around the window
-- `GothamBold` typeface instead of `Code`
 - **Corner decals**: put a different image on any window corner just with its ID
 
 ## Corner decals
