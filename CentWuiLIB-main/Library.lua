@@ -1150,6 +1150,12 @@ do
             ZIndex = 6;
             Parent = ToggleLabel;
         });
+        local PickOuterGradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
+            Rotation = 0;
+            Enabled = true;
+            Parent = PickOuter;
+        });
 
         local PickInner = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1182,6 +1188,13 @@ do
             ZIndex = 14;
             Parent = ScreenGui;
         });
+        local ModeSelectGradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
+            Rotation = 0;
+            Enabled = true;
+            Parent = ModeSelectOuter;
+        });
+
 
         ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
             ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
@@ -3536,9 +3549,9 @@ function Library:CreateWindow(...)
         Library:ApplyCorner(TabButton, UDim.new(0, 6));
 
         local TabButtonGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor);
+            Color = ColorSequence.new(Library.AccentColor, Library.AccentColor2 or Library.AccentColor);
             Rotation = 0;
-            Enabled = false;
+            Enabled = true;
             Parent = TabButton;
         });
 
