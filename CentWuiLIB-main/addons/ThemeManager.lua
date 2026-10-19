@@ -5,7 +5,7 @@ local ThemeManager = {} do
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
-		['CentWui'] 		= { 0, httpService:JSONDecode('{"FontColor":"ebeEff","MainColor":"161620","AccentColor":"7c5cff","BackgroundColor":"0d0d14","OutlineColor":"2a2a3c"}') },
+		['CentWui'] 		= { 0, httpService:JSONDecode('{"FontColor":"f0ebff","MainColor":"2e1856","AccentColor":"a86eff","BackgroundColor":"1a0c36","OutlineColor":"583496"}') },
 		['Default'] 		= { 1, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1c1c1c","AccentColor":"0055ff","BackgroundColor":"141414","OutlineColor":"323232"}') },
 		['BBot'] 			= { 2, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"7e48a3","BackgroundColor":"232323","OutlineColor":"141414"}') },
 		['Fatality']		= { 3, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1842","AccentColor":"c50754","BackgroundColor":"191335","OutlineColor":"3c355d"}') },
