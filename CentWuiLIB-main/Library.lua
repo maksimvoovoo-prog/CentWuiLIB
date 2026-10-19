@@ -71,7 +71,7 @@ local Library = {
 
     Signals = {};
     ScreenGui = ScreenGui;
-    CentWuiVersion = '1.1.0';
+    CentWuiVersion = '1.1.1';
 };
 
 local RainbowStep = 0
@@ -119,7 +119,6 @@ local function GetTeamsString()
 end;
 
 function Library:ResolveDecalAsset(Asset)
-    -- Accepts: 12345678 | "12345678" | "rbxassetid://12345678" | "http..." (returned as-is)
     if Asset == nil or Asset == '' or Asset == 0 or Asset == '0' then
         return nil;
     end;
@@ -190,7 +189,6 @@ function Library:ApplyCorner(Inst, Radius)
 end;
 
 function Library:ApplyGlow(Inst, Color, Transparency)
-    -- Soft drop-glow using UIStroke (works on executors without blur)
     return Library:Create('UIStroke', {
         Color = Color or Library.AccentColor;
         Thickness = 1.5;
@@ -202,7 +200,6 @@ function Library:ApplyGlow(Inst, Color, Transparency)
 end;
 
 function Library:GradientRotationForDirection(Direction)
-    -- 'Sideways' -> 0 deg (left->right), 'Downways' -> 90 deg (top->bottom)
     if type(Direction) ~= 'string' then
         Direction = Library.DefaultGradientDirection;
     end;
@@ -473,16 +470,6 @@ function Library:RemoveFromRegistry(Instance)
 end;
 
 function Library:UpdateColorsUsingRegistry()
-    -- TODO: Could have an 'active' list of objects
-    -- where the active list only contains Visible objects.
-
-    -- IMPL: Could setup .Changed events on the AddToRegistry function
-    -- that listens for the 'Visible' propert being changed.
-    -- Visible: true => Add to active list, and call UpdateColors function
-    -- Visible: false => Remove from active list.
-
-    -- The above would be especially efficient for a rainbow menu color or live color-changing.
-
     for Idx, Object in next, Library.Registry do
         for Property, ColorIdx in next, Object.Properties do
             if type(ColorIdx) == 'string' then
@@ -495,18 +482,15 @@ function Library:UpdateColorsUsingRegistry()
 end;
 
 function Library:GiveSignal(Signal)
-    -- Only used for signals not attached to library instances, as those should be cleaned up on object destruction by Roblox
     table.insert(Library.Signals, Signal)
 end
 
 function Library:Unload()
-    -- Unload all of the signals
     for Idx = #Library.Signals, 1, -1 do
         local Connection = table.remove(Library.Signals, Idx)
         Connection:Disconnect()
     end
 
-     -- Call our unload callback, maybe to undo some hooks etc
     if Library.OnUnload then
         Library.OnUnload()
     end
@@ -531,7 +515,6 @@ do
 
     function Funcs:AddColorPicker(Idx, Info)
         local ToggleLabel = self.TextLabel;
-        -- local Container = self.Container;
 
         assert(Info.Default, 'AddColorPicker: Missing default value.');
 
@@ -562,7 +545,6 @@ do
             Parent = ToggleLabel;
         });
 
-        -- Transparency image taken from https://github.com/matas3535/SplixPrivateDrawingLibrary/blob/main/Library.lua cus i'm lazy
         local CheckerFrame = Library:Create('ImageLabel', {
             BorderSizePixel = 0;
             Size = UDim2.new(0, 27, 0, 13);
@@ -571,11 +553,6 @@ do
             Visible = not not Info.Transparency;
             Parent = DisplayFrame;
         });
-
-        -- 1/16/23
-        -- Rewrote this to be placed inside the Library ScreenGui
-        -- There was some issue which caused RelativeOffset to be way off
-        -- Thus the color picker would never show
 
         local PickerFrameOuter = Library:Create('Frame', {
             Name = 'Color';
@@ -779,12 +756,11 @@ do
             Position = UDim2.fromOffset(5, 5);
             TextXAlignment = Enum.TextXAlignment.Left;
             TextSize = 14;
-            Text = ColorPicker.Title,--Info.Default;
+            Text = ColorPicker.Title;
             TextWrapped = false;
             ZIndex = 16;
             Parent = PickerFrameInner;
         });
-
 
         local ContextMenu = {}
         do
@@ -900,7 +876,6 @@ do
                 ColorPicker:SetValueRGB(Library.ColorClipboard)
             end)
 
-
             ContextMenu:AddOption('Copy HEX', function()
                 pcall(setclipboard, ColorPicker.Value:ToHex())
                 Library:Notify('Copied hex code to clipboard!', 2)
@@ -910,7 +885,6 @@ do
                 pcall(setclipboard, table.concat({ math.floor(ColorPicker.Value.R * 255), math.floor(ColorPicker.Value.G * 255), math.floor(ColorPicker.Value.B * 255) }, ', '))
                 Library:Notify('Copied RGB values to clipboard!', 2)
             end)
-
         end
 
         Library:AddToRegistry(PickerFrameInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
@@ -1123,14 +1097,13 @@ do
     function Funcs:AddKeyPicker(Idx, Info)
         local ParentObj = self;
         local ToggleLabel = self.TextLabel;
-        local Container = self.Container;
 
         assert(Info.Default, 'AddKeyPicker: Missing default value.');
 
         local KeyPicker = {
             Value = Info.Default;
             Toggled = false;
-            Mode = Info.Mode or 'Toggle'; -- Always, Toggle, Hold
+            Mode = Info.Mode or 'Toggle';
             Type = 'KeyPicker';
             Callback = Info.Callback or function(Value) end;
             ChangedCallback = Info.ChangedCallback or function(New) end;
@@ -1194,7 +1167,6 @@ do
             Enabled = true;
             Parent = ModeSelectOuter;
         });
-
 
         ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
             ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
@@ -1537,7 +1509,6 @@ do
     end;
 
     function Funcs:AddButton(...)
-        -- TODO: Eventually redo this
         local Button = {};
         local function ProcessButtonParams(Class, Obj, ...)
             local Props = select(1, ...)
@@ -1614,7 +1585,6 @@ do
             local function WaitForEvent(event, timeout, validator)
                 local bindable = Instance.new('BindableEvent')
                 local connection = event:Once(function(...)
-
                     if type(validator) == 'function' and validator(...) then
                         bindable:Fire(true)
                     else
@@ -1683,7 +1653,6 @@ do
             end
             return self
         end
-
 
         function Button:AddButton(...)
             local SubButton = {}
@@ -1827,7 +1796,7 @@ do
             Parent = TextBoxInner;
         });
 
-        local Container = Library:Create('Frame', {
+        local ContainerBox = Library:Create('Frame', {
             BackgroundTransparency = 1;
             ClipsDescendants = true;
 
@@ -1855,7 +1824,7 @@ do
             TextXAlignment = Enum.TextXAlignment.Left;
 
             ZIndex = 7;
-            Parent = Container;
+            Parent = ContainerBox;
         });
 
         Library:ApplyTextStroke(Box);
@@ -1892,28 +1861,19 @@ do
             end);
         end
 
-        -- https://devforum.roblox.com/t/how-to-make-textboxes-follow-current-cursor-position/1368429/6
-        -- thank you nicemike40 :)
-
         local function Update()
             local PADDING = 2
-            local reveal = Container.AbsoluteSize.X
+            local reveal = ContainerBox.AbsoluteSize.X
 
             if not Box:IsFocused() or Box.TextBounds.X <= reveal - 2 * PADDING then
-                -- we aren't focused, or we fit so be normal
                 Box.Position = UDim2.new(0, PADDING, 0, 0)
             else
-                -- we are focused and don't fit, so adjust position
                 local cursor = Box.CursorPosition
                 if cursor ~= -1 then
-                    -- calculate pixel width of text from start to cursor
                     local subtext = string.sub(Box.Text, 1, cursor-1)
                     local width = TextService:GetTextSize(subtext, Box.TextSize, Box.Font, Vector2.new(math.huge, math.huge)).X
-
-                    -- check if we're inside the box with the cursor
                     local currentCursorPos = Box.Position.X.Offset + width
 
-                    -- adjust if necessary
                     if currentCursorPos < PADDING then
                         Box.Position = UDim2.fromOffset(PADDING-width, 0)
                     elseif currentCursorPos > reveal - PADDING - 1 then
@@ -2059,7 +2019,7 @@ do
 
         ToggleRegion.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                Toggle:SetValue(not Toggle.Value) -- Why was it not like this from the start?
+                Toggle:SetValue(not Toggle.Value)
                 Library:AttemptSave();
             end;
         end);
@@ -2220,7 +2180,6 @@ do
                 return math.floor(Value);
             end;
 
-
             return tonumber(string.format('%.' .. Slider.Rounding .. 'f', Value))
         end;
 
@@ -2302,7 +2261,7 @@ do
             Value = Info.Multi and {};
             Multi = Info.Multi;
             Type = 'Dropdown';
-            SpecialType = Info.SpecialType; -- can be either 'Player' or 'Team'
+            SpecialType = Info.SpecialType;
             Callback = Info.Callback or function(Value) end;
         };
 
@@ -2811,7 +2770,6 @@ do
     end;
 end;
 
--- < Create other UI elements >
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2862,7 +2820,6 @@ do
     });
     Library:ApplyCorner(InnerFrame, UDim.new(0, 8));
 
-    -- CentWui signature: thin top accent line with violet->cyan gradient
     local TopAccent = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
         BorderSizePixel = 0;
@@ -2904,8 +2861,6 @@ do
     Library.Watermark = WatermarkOuter;
     Library.WatermarkText = WatermarkLabel;
     Library:MakeDraggable(Library.Watermark);
-
-
 
     local KeybindOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
@@ -3125,17 +3080,16 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
     Library:ApplyCorner(Outer, Config.CornerRadius);
-    -- Subtle violet glow around the window (CentWui pop)
     local OuterGlow = Library:ApplyGlow(Outer, Library.AccentColor, Config.GlowTransparency or Library.GlowTransparency);
     Library:AddToRegistry(OuterGlow, { Color = 'AccentColor' });
 
     Library:MakeDraggable(Outer, 25);
 
-    -- Background canvas: gradient + bg decal live HERE, behind everything.
-    -- Content panels above it are semi-transparent so art shows through.
+    -- Background canvas container for gradients & full-background decals
     local BgCanvas = Library:Create('Frame', {
         Name = 'CentWuiBackground';
         BackgroundColor3 = Library.MainColor;
+        BackgroundTransparency = 0;
         BorderSizePixel = 0;
         Size = UDim2.new(1, 0, 1, 0);
         ZIndex = 1;
@@ -3150,7 +3104,7 @@ function Library:CreateWindow(...)
     local Inner = Library:Create('Frame', {
         Name = 'CentWuiContent';
         BackgroundColor3 = Library.MainColor;
-        BackgroundTransparency = 0.25;
+        BackgroundTransparency = 0.35;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -3173,7 +3127,6 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
 
-    -- CentWui header accent: rounded gradient line under title
     local HeaderAccent = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
         BorderSizePixel = 0;
@@ -3185,12 +3138,11 @@ function Library:CreateWindow(...)
     Library:ApplyCorner(HeaderAccent, UDim.new(1, 0));
     Library:ApplyAccentGradient(HeaderAccent, 0);
 
-    -- Corner decal layer (always on top of window chrome, click-through)
     local DecalLayer = Library:Create('Frame', {
         Name = 'CentWuiDecals';
         BackgroundTransparency = 1;
         Size = UDim2.new(1, 0, 1, 0);
-        ZIndex = 50;
+        ZIndex = 60;
         Parent = Outer;
     });
     Library:Create('UICorner', { CornerRadius = Config.CornerRadius; Parent = DecalLayer });
@@ -3214,16 +3166,12 @@ function Library:CreateWindow(...)
     local CornerDecals = {};
 
     function Window:SetCornerDecal(Corner, AssetId, Transparency, Size, ImageColor)
-        -- Coerce common mistakes: Window:SetCornerDecal('TopRight', '123', '0.2', '64')
         if typeof(Transparency) == 'string' then Transparency = tonumber(Transparency); end;
         if typeof(Size) == 'string' then Size = tonumber(Size); end;
 
         Corner = NormalizeCorner(Corner);
         local Anchor, Pos = GetCornerAnchor(Corner);
-        if not Anchor then
-            warn(('[CentWuiLib] Unknown corner "%s". Use TopLeft/TopRight/BottomLeft/BottomRight.'):format(tostring(Corner)));
-            return nil;
-        end;
+        if not Anchor then return nil; end;
 
         local existing = CornerDecals[Corner];
         local image = Library:ResolveDecalAsset(AssetId);
@@ -3260,7 +3208,7 @@ function Library:CreateWindow(...)
         label.Size = UDim2.fromOffset(Size, Size);
         label.Image = image;
         label.ImageTransparency = Transparency;
-        label.ZIndex = 50;
+        label.ZIndex = 60;
         label.Visible = true;
         if typeof(ImageColor) == 'Color3' then label.ImageColor3 = ImageColor; end;
 
@@ -3298,12 +3246,6 @@ function Library:CreateWindow(...)
         for _, C in ipairs({ 'TopLeft', 'TopRight', 'BottomLeft', 'BottomRight' }) do Window:ClearCorner(C); end;
     end;
 
-    -- // CentWui background gradient (behind content, above Inner).
-    -- // Window:SetBackgroundGradient('Sideways') | ('Downways') | (0-360 number)
-    -- // Window:SetBackgroundGradient(true) uses Config.BackgroundGradient / default.
-    -- // Window:SetBackgroundGradient(false/nil) removes it.
-    -- // Window:SetBackgroundGradientDirection('Sideways')
-    -- // Window:SetBackgroundGradientColors(Color3, Color3) for custom stops.
     local BackgroundGradient = nil;
 
     function Window:SetBackgroundGradient(Direction)
@@ -3317,10 +3259,7 @@ function Library:CreateWindow(...)
         end;
 
         if Direction == true then
-            Direction = Config.BackgroundGradient;
-            if Direction == true or Direction == nil then
-                Direction = Library.DefaultGradientDirection;
-            end;
+            Direction = Library.DefaultGradientDirection;
         end;
 
         local Rotation = Library:GradientRotationForDirection(Direction);
@@ -3368,10 +3307,6 @@ function Library:CreateWindow(...)
         return nil;
     end;
 
-    -- // CentWui full-background decal (stretched art behind content).
-    -- // Window:SetBackgroundDecal(12345678, 0.85) -> (assetId, transparency 0..1)
-    -- // Window:SetBackgroundTransparency(0.5)
-    -- // Window:ClearBackgroundDecal()
     local BackgroundDecal = nil;
 
     function Window:SetBackgroundDecal(AssetId, Transparency, ImageColor)
@@ -3442,10 +3377,6 @@ function Library:CreateWindow(...)
     Window.DecalLayer = DecalLayer;
     Library.CornerDecals[Window] = CornerDecals;
 
-    -- Config shortcuts so script users can set everything in one table:
-    -- BackgroundGradient = 'Sideways' | 'Downways' | 0-360 | true | false
-    -- BackgroundDecal = 12345678 | { Asset = 123, Transparency = 0.85 }
-    -- NOTE: nil/false both mean "no gradient" here (opt-in feature).
     if Config.BackgroundGradient ~= nil and Config.BackgroundGradient ~= false then
         if type(Config.BackgroundGradientColors) == 'table' then
             Window:SetBackgroundGradientColors(Config.BackgroundGradientColors[1], Config.BackgroundGradientColors[2]);
@@ -3802,7 +3733,6 @@ function Library:CreateWindow(...)
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
                 BorderColor3 = Color3.new(0, 0, 0);
-                -- BorderMode = Enum.BorderMode.Inset;
                 Size = UDim2.new(1, -2, 1, -2);
                 Position = UDim2.new(0, 1, 0, 1);
                 ZIndex = 4;
@@ -3958,7 +3888,6 @@ function Library:CreateWindow(...)
                 Tab:AddBlank(3);
                 Tab:Resize();
 
-                -- Show first tab (number is 2 cus of the UIListLayout that also sits in that instance)
                 if #TabboxButtons:GetChildren() == 2 then
                     Tab:Show();
                 end;
@@ -3985,7 +3914,6 @@ function Library:CreateWindow(...)
             end;
         end);
 
-        -- This was the first tab added, so we show it by default.
         if #TabContainer:GetChildren() == 1 then
             Tab:ShowTab();
         end;
@@ -4018,11 +3946,9 @@ function Library:CreateWindow(...)
         ModalElement.Modal = Toggled;
 
         if Toggled then
-            -- A bit scuffed, but if we're going from not toggled -> toggled we want to show the frame immediately so that the fade is visible.
             Outer.Visible = true;
 
             task.spawn(function()
-                -- TODO: add cursor fade?
                 local State = InputService.MouseIconEnabled;
 
                 local Cursor = Drawing.new('Triangle');
@@ -4065,7 +3991,6 @@ function Library:CreateWindow(...)
             local Properties = {};
 
             if Desc:IsA('ImageLabel') then
-                -- CentWui decals: don't let the menu fade overwrite user transparency.
                 local IsDecal = (Desc.Parent == DecalLayer) or Desc:GetAttribute('CentWuiDecal');
                 if not IsDecal then
                     table.insert(Properties, 'ImageTransparency');
