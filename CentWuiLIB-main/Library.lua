@@ -112,6 +112,82 @@ local function GetTeamsString()
     return TeamList;
 end;
 
+-- ImageLabels need an IMAGE asset id. Many ids people copy are DECAL ids, which show up blank.
+-- This tries: the id as-is -> decal->image via GetObjects (executors) -> legacy asset url.
+-- Set Library.DecalDebug = true to print what happened. A failure always warns in the console.
+Library.DecalImageCache = {};
+Library.DecalDebug = false;
+
+function Library:ResolveDecalImage(Label)
+    local Original = Label.Image;
+    local Id = Original:match('rbxassetid://(%d+)') or Original:match('[?&]id=(%d+)');
+    if not Id then
+        return;
+    end;
+
+    local Cached = Library.DecalImageCache[Id];
+    if Cached then
+        Label.Image = Cached;
+        return;
+    end;
+
+    Label:SetAttribute('CentWuiDecalSource', Original);
+
+    task.spawn(function()
+        local function Stale()
+            return (not Label.Parent) or Label:GetAttribute('CentWuiDecalSource') ~= Original;
+        end;
+
+        local function Loaded()
+            pcall(function()
+                game:GetService('ContentProvider'):PreloadAsync({ Label });
+            end);
+            return Label.IsLoaded;
+        end;
+
+        if Stale() then
+            return;
+        end;
+        if Loaded() then
+            if Library.DecalDebug then print(('[CentWuiLib] decal %s loaded as an image'):format(Id)); end;
+            return;
+        end;
+
+        local Candidates = {};
+
+        pcall(function()
+            local Objects = game:GetObjects('rbxassetid://' .. Id);
+            for _, Obj in ipairs(Objects) do
+                if (Obj:IsA('Decal') or Obj:IsA('Texture')) and Obj.Texture ~= '' then
+                    table.insert(Candidates, Obj.Texture);
+                end;
+                pcall(function() Obj:Destroy(); end);
+            end;
+        end);
+
+        table.insert(Candidates, 'http://www.roblox.com/asset/?id=' .. Id);
+
+        for _, Candidate in ipairs(Candidates) do
+            if Stale() then
+                return;
+            end;
+
+            Label.Image = Candidate;
+
+            if Loaded() then
+                Library.DecalImageCache[Id] = Candidate;
+                if Library.DecalDebug then print(('[CentWuiLib] decal %s resolved to %s'):format(Id, Candidate)); end;
+                return;
+            end;
+        end;
+
+        if not Stale() then
+            Label.Image = Original;
+            warn(('[CentWuiLib] decal %s did not load. It may be a Decal id - use the Image id (open the decal in Studio / toolbox and copy the texture id), or the asset is not public.'):format(Id));
+        end;
+    end);
+end;
+
 function Library:ResolveDecalAsset(Asset)
     if Asset == nil or Asset == '' or Asset == 0 or Asset == '0' then
         return nil;
@@ -530,6 +606,37 @@ end;
 Library.TabAnimation = true;
 Library.TabAnimationTime = 0.32;
 Library.TabSlideDistance = 26;
+
+-- ///////////////////////////////////////////////////////////
+-- // WINDOW BACKGROUND TRANSPARENCY
+-- // Library.PanelTransparency: 0 = normal look, 1 = panels fully see-through
+-- // (lets the background gradient / image / the game show through).
+-- // Window:SetBackgroundTransparency(0.5)
+-- ///////////////////////////////////////////////////////////
+Library.PanelTransparency = 0;
+Library.PanelBase = setmetatable({}, { __mode = 'k' }); -- frame -> its original BackgroundTransparency
+
+function Library:GetPanelTransparency(Frame)
+    local Base = Library.PanelBase[Frame];
+    if Base == nil then
+        return Frame.BackgroundTransparency;
+    end;
+    return math.clamp(1 - (1 - Base) * (1 - Library.PanelTransparency), 0, 1);
+end;
+
+function Library:RegisterPanel(Frame)
+    Library.PanelBase[Frame] = Frame.BackgroundTransparency;
+    Frame.BackgroundTransparency = Library:GetPanelTransparency(Frame);
+    return Frame;
+end;
+
+function Library:SetPanelTransparency(Value)
+    Library.PanelTransparency = math.clamp(tonumber(Value) or 0, 0, 1);
+    for Frame in next, Library.PanelBase do
+        Frame.BackgroundTransparency = Library:GetPanelTransparency(Frame);
+    end;
+    return Library.PanelTransparency;
+end;
 
 function Library:Create(Class, Properties)
     local _Instance = Class;
@@ -3559,6 +3666,7 @@ function Library:CreateWindow(...)
         label.Position = Pos;
         label.Size = UDim2.fromOffset(Size, Size);
         label.Image = image;
+        Library:ResolveDecalImage(label);
         label.ImageTransparency = Transparency;
         label.ZIndex = 60;
         label.Visible = true;
@@ -3693,6 +3801,7 @@ function Library:CreateWindow(...)
         end;
 
         BackgroundDecal.Image = image;
+        Library:ResolveDecalImage(BackgroundDecal);
         BackgroundDecal.ImageTransparency = Transparency;
         BackgroundDecal.Visible = true;
         if typeof(ImageColor) == 'Color3' then BackgroundDecal.ImageColor3 = ImageColor; end;
@@ -3704,7 +3813,13 @@ function Library:CreateWindow(...)
         return BackgroundDecal;
     end;
 
+    -- window background (panels + gradient): 0 = normal, 1 = fully see-through
     function Window:SetBackgroundTransparency(Transparency)
+        return Library:SetPanelTransparency(Transparency);
+    end;
+
+    -- transparency of the background IMAGE only
+    function Window:SetBackgroundDecalTransparency(Transparency)
         if not BackgroundDecal then return nil; end;
         Transparency = math.clamp(tonumber(Transparency) or 0, 0, 1);
         BackgroundDecal.ImageTransparency = Transparency;
@@ -3736,15 +3851,19 @@ function Library:CreateWindow(...)
         Window:SetBackgroundGradient(Config.BackgroundGradient);
     end;
 
+    if Config.BackgroundTransparency ~= nil then
+        Library:SetPanelTransparency(Config.BackgroundTransparency);
+    end;
+
     if Config.BackgroundDecal ~= nil then
         if type(Config.BackgroundDecal) == 'table' then
             Window:SetBackgroundDecal(
                 Config.BackgroundDecal.Asset or Config.BackgroundDecal.Id or Config.BackgroundDecal.Image,
-                Config.BackgroundDecal.Transparency or Config.BackgroundTransparency or 0,
+                Config.BackgroundDecal.Transparency or Config.BackgroundDecalTransparency or 0,
                 Config.BackgroundDecal.Color
             );
         else
-            Window:SetBackgroundDecal(Config.BackgroundDecal, Config.BackgroundTransparency or 0);
+            Window:SetBackgroundDecal(Config.BackgroundDecal, Config.BackgroundDecalTransparency or 0);
         end;
     end;
 
@@ -3808,6 +3927,11 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(TabContainer, {
         BackgroundColor3 = 'MainColor';
     });
+
+    -- window panels that follow Window:SetBackgroundTransparency
+    for _, Panel in next, { BgCanvas, Inner, MainSectionOuter, MainSectionInner, TabContainer } do
+        Library:RegisterPanel(Panel);
+    end;
 
     -- sliding underline that follows the active tab
     local TabIndicator = Library:Create('Frame', {
@@ -4157,6 +4281,8 @@ function Library:CreateWindow(...)
             });
 
             Library:ApplyInnerGlow(BoxOuter, 8, 5);
+            Library:RegisterPanel(BoxOuter);
+            Library:RegisterPanel(BoxInner);
 
             function Groupbox:Resize()
                 local Size = 0;
@@ -4250,6 +4376,8 @@ function Library:CreateWindow(...)
             });
 
             Library:ApplyInnerGlow(BoxOuter, 0, 5);
+            Library:RegisterPanel(BoxOuter);
+            Library:RegisterPanel(BoxInner);
 
             function Tabbox:AddTab(Name)
                 local Tab = {};
@@ -4506,6 +4634,10 @@ function Library:CreateWindow(...)
             for _, Prop in next, Properties do
                 if not Cache[Prop] then
                     Cache[Prop] = Desc[Prop];
+                end;
+
+                if Prop == 'BackgroundTransparency' and Library.PanelBase[Desc] then
+                    Cache[Prop] = Library:GetPanelTransparency(Desc); -- follows SetBackgroundTransparency
                 end;
 
                 if Prop == 'Transparency' and Library.GlowStrokes[Desc] then
