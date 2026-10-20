@@ -182,10 +182,10 @@ function Library:ApplyCorner(Inst, Radius)
     });
 end;
 
-function Library:ApplyGlow(Inst, Color, Transparency)
+function Library:ApplyGlow(Inst, Color, Transparency, Thickness)
     return Library:Create('UIStroke', {
         Color = Color or Library.AccentColor;
-        Thickness = 1.5;
+        Thickness = Thickness or 1.5;
         Transparency = Transparency or Library.GlowTransparency;
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
         LineJoinMode = Enum.LineJoinMode.Round;
@@ -379,6 +379,158 @@ function Library:SetColor(Inst, Property, ColorIdx)
     Inst[Property] = Library:ResolveColor(ColorIdx);
 end;
 
+-- ///////////////////////////////////////////////////////////
+-- // GRADIENT GLOW
+-- // Soft multi-layer glow around borders. Every layer is a UIStroke with the
+-- // accent gradient (category 'Glow'), so it follows theme + direction settings.
+-- //   Library:SetGlow(true/false)          turn all glows on/off
+-- //   Library:SetGlowIntensity(0..1)       strength
+-- //   Library:SetGlowAnimated(true/false)  slowly spinning gradient
+-- //   Library.GlowSpinSpeed = 40           degrees per second
+-- //   Library.HoverGlow = true             glow when hovering buttons/toggles/sliders/inputs
+-- ///////////////////////////////////////////////////////////
+Library.GlowEnabled = true;
+Library.GlowIntensity = 1;
+Library.GlowAnimated = true;
+Library.GlowSpinSpeed = 40;
+Library.HoverGlow = true;
+-- { thickness, transparency } per layer (outer glow of the window)
+Library.GlowLayers = { { 1.5, 0.45 }, { 3, 0.78 }, { 5, 0.9 }, { 8, 0.96 } };
+-- same, but drawn INSIDE a box (groupboxes are clipped by their scroll frame, so they glow inwards)
+Library.InnerGlowLayers = { { 1, 0.5 }, { 2.5, 0.82 }, { 4.5, 0.94 } };
+
+Library.GlowStrokes = setmetatable({}, { __mode = 'k' });   -- stroke -> base transparency
+Library.GlowGradients = setmetatable({}, { __mode = 'k' }); -- stroke -> its UIGradient
+
+function Library:GetGlowTransparency(Stroke)
+    local Base = Library.GlowStrokes[Stroke];
+    if not Base then
+        return Stroke.Transparency;
+    end;
+    return math.clamp(1 - (1 - Base) * Library.GlowIntensity, 0, 1);
+end;
+
+function Library:RegisterGlowStroke(Stroke, Base)
+    Library.GlowStrokes[Stroke] = Base;
+    Library:AddToRegistry(Stroke, { Color = 'AccentColor' }); -- creates the accent gradient
+    Library.GlowGradients[Stroke] = Stroke:FindFirstChild('CentWuiAccent_Color');
+    Stroke.Transparency = Library:GetGlowTransparency(Stroke);
+    Stroke.Enabled = Library.GlowEnabled;
+    return Stroke;
+end;
+
+-- glow OUTSIDE of Inst (for things that are not clipped, like the window)
+function Library:ApplyBorderGlow(Inst)
+    local List = {};
+    for _, Layer in ipairs(Library.GlowLayers) do
+        local Stroke = Library:ApplyGlow(Inst, nil, Layer[2], Layer[1]);
+        Stroke.Name = 'CentWuiGlow';
+        Library:RegisterGlowStroke(Stroke, Layer[2]);
+        table.insert(List, Stroke);
+    end;
+    return List;
+end;
+
+-- glow INSIDE of Inst (Radius = Inst's corner radius in pixels)
+function Library:ApplyInnerGlow(Inst, Radius, ZIndex)
+    Radius = Radius or 0;
+    local List = {};
+
+    for _, Layer in ipairs(Library.InnerGlowLayers) do
+        local T = Layer[1];
+        local Host = Library:Create('Frame', {
+            Name = 'CentWuiInnerGlow';
+            BackgroundTransparency = 1;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, T, 0, T);
+            Size = UDim2.new(1, -2 * T, 1, -2 * T);
+            ZIndex = ZIndex or 5;
+            Parent = Inst;
+        });
+        if Radius > 0 then
+            Library:Create('UICorner', { CornerRadius = UDim.new(0, math.max(Radius - T, 0)); Parent = Host; });
+        end;
+
+        local Stroke = Library:ApplyGlow(Host, nil, Layer[2], T);
+        Stroke.Name = 'CentWuiGlow';
+        Library:RegisterGlowStroke(Stroke, Layer[2]);
+        table.insert(List, Stroke);
+    end;
+
+    return List;
+end;
+
+-- hover glow (created the first time it is needed)
+function Library:GetHoverGlow(Inst)
+    local Glow = Inst:FindFirstChild('CentWuiHoverGlow');
+    if not Glow then
+        Glow = Library:ApplyGlow(Inst, nil, 1, 2.5);
+        Glow.Name = 'CentWuiHoverGlow';
+        Glow:SetAttribute('CentWuiHover', true);
+        Library:RegisterGlowStroke(Glow, 0.3);
+        Glow.Transparency = 1;
+    end;
+    return Glow;
+end;
+
+function Library:SetHoverGlow(Inst, On)
+    if not (Library.HoverGlow and Library.GlowEnabled) then
+        return;
+    end;
+    local Glow = Library:GetHoverGlow(Inst);
+    TweenService:Create(Glow, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Transparency = On and Library:GetGlowTransparency(Glow) or 1;
+    }):Play();
+end;
+
+function Library:SetGlow(Enabled)
+    Library.GlowEnabled = not not Enabled;
+    for Stroke in next, Library.GlowStrokes do
+        Stroke.Enabled = Library.GlowEnabled;
+    end;
+end;
+
+function Library:SetGlowIntensity(Value)
+    Library.GlowIntensity = math.clamp(Value or 1, 0, 1);
+    for Stroke in next, Library.GlowStrokes do
+        if not Stroke:GetAttribute('CentWuiHover') then
+            Stroke.Transparency = Library:GetGlowTransparency(Stroke);
+        end;
+    end;
+end;
+
+function Library:SetGlowAnimated(Enabled)
+    Library.GlowAnimated = not not Enabled;
+    if not Library.GlowAnimated then
+        Library:RefreshGradientDirections();
+    end;
+end;
+
+-- spinning glow gradients
+do
+    local Spin = 0;
+    table.insert(Library.Signals, RenderStepped:Connect(function(Delta)
+        if not (Library.GlowAnimated and Library.GlowEnabled) then
+            return;
+        end;
+
+        Spin = (Spin + Delta * Library.GlowSpinSpeed) % 360;
+
+        for Stroke, Grad in next, Library.GlowGradients do
+            if Grad.Parent and Stroke.Transparency < 1 then
+                Grad.Rotation = (Library:GetGradientRotation(Stroke, 'Color') + Spin) % 360;
+            end;
+        end;
+    end));
+end;
+
+-- ///////////////////////////////////////////////////////////
+-- // TAB ANIMATION SETTINGS (see Tab:ShowTab)
+-- ///////////////////////////////////////////////////////////
+Library.TabAnimation = true;
+Library.TabAnimationTime = 0.32;
+Library.TabSlideDistance = 26;
+
 function Library:Create(Class, Properties)
     local _Instance = Class;
 
@@ -510,8 +662,14 @@ function Library:AddToolTip(InfoStr, HoverInstance)
 end
 
 function Library:OnHighlight(HighlightInstance, Instance, Properties, PropertiesDefault)
+    local GlowsOnHover = (Properties.BorderColor3 == 'AccentColor');
+
     HighlightInstance.MouseEnter:Connect(function()
         local Reg = Library.RegistryMap[Instance];
+
+        if GlowsOnHover then
+            Library:SetHoverGlow(Instance, true);
+        end;
 
         for Property, ColorIdx in next, Properties do
             Library:SetColor(Instance, Property, ColorIdx);
@@ -524,6 +682,10 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
 
     HighlightInstance.MouseLeave:Connect(function()
         local Reg = Library.RegistryMap[Instance];
+
+        if GlowsOnHover then
+            Library:SetHoverGlow(Instance, false);
+        end;
 
         for Property, ColorIdx in next, PropertiesDefault do
             Library:SetColor(Instance, Property, ColorIdx);
@@ -3235,6 +3397,11 @@ function Library:CreateWindow(...)
 
     if type(Config.Title) ~= 'string' then Config.Title = 'No title' end
     if type(Config.TabPadding) ~= 'number' then Config.TabPadding = 8 end
+    for _, Key in next, { 'GlowEnabled', 'GlowIntensity', 'GlowAnimated', 'GlowSpinSpeed', 'HoverGlow', 'TabAnimation', 'TabAnimationTime', 'TabSlideDistance' } do
+        if Config[Key] ~= nil then
+            Library[Key] = Config[Key];
+        end;
+    end;
     if type(Config.GradientDirections) == 'table' then
         for Cat, Dir in next, Config.GradientDirections do
             Library.GradientDirections[Cat] = Dir;
@@ -3267,8 +3434,7 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
     Library:ApplyCorner(Outer, Config.CornerRadius);
-    local OuterGlow = Library:ApplyGlow(Outer, Library.AccentColor, Config.GlowTransparency or Library.GlowTransparency);
-    Library:AddToRegistry(OuterGlow, { Color = 'AccentColor' }); -- auto gradient stroke
+    Library:ApplyBorderGlow(Outer); -- multi-layer gradient glow around the window
 
     Library:MakeDraggable(Outer, 25);
 
@@ -3633,6 +3799,7 @@ function Library:CreateWindow(...)
         BorderSizePixel = 0;
         Position = UDim2.new(0, 8, 0, 30);
         Size = UDim2.new(1, -16, 1, -38);
+        ClipsDescendants = true; -- tab content slides in from the side
         ZIndex = 1;
         Parent = MainSectionInner;
     });
@@ -3641,6 +3808,63 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(TabContainer, {
         BackgroundColor3 = 'MainColor';
     });
+
+    -- sliding underline that follows the active tab
+    local TabIndicator = Library:Create('Frame', {
+        Name = 'CentWuiTabIndicator';
+        BackgroundColor3 = Library.FontColor;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 0, 0, 29);
+        Size = UDim2.new(0, 0, 0, 2);
+        Visible = false;
+        ZIndex = 7;
+        Parent = MainSectionInner;
+    });
+    Library:ApplyCorner(TabIndicator, UDim.new(1, 0));
+    Library:AddToRegistry(TabIndicator, { BackgroundColor3 = 'FontColor' });
+
+    local IndicatorGoal, IndicatorTween;
+
+    function Window:UpdateTabIndicator(Button, Animate)
+        if not Button then
+            TabIndicator.Visible = false;
+            return;
+        end;
+
+        local Width = Button.AbsoluteSize.X;
+        if Width <= 0 then
+            return; -- layout not ready yet, the AbsoluteSize signal calls this again
+        end;
+
+        local X = Button.AbsolutePosition.X - MainSectionInner.AbsolutePosition.X;
+        local Goal = {
+            Position = UDim2.fromOffset(X + 4, 29);
+            Size = UDim2.fromOffset(math.max(Width - 8, 4), 2);
+        };
+
+        if IndicatorGoal and IndicatorGoal.Position == Goal.Position and IndicatorGoal.Size == Goal.Size then
+            return;
+        end;
+        IndicatorGoal = Goal;
+
+        if IndicatorTween then
+            IndicatorTween:Cancel();
+            IndicatorTween = nil;
+        end;
+
+        if Animate and Library.TabAnimation and TabIndicator.Visible then
+            IndicatorTween = TweenService:Create(TabIndicator, TweenInfo.new(Library.TabAnimationTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), Goal);
+            IndicatorTween:Play();
+        else
+            TabIndicator.Position = Goal.Position;
+            TabIndicator.Size = Goal.Size;
+            TabIndicator.Visible = true;
+        end;
+    end;
+
+    function Window:SetTabAnimation(Enabled)
+        Library.TabAnimation = not not Enabled;
+    end;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
@@ -3691,6 +3915,7 @@ function Library:CreateWindow(...)
 
         Tab.Gradient = TabButtonGradient;
         Tab.TextBackground = TabTextBackground;
+        Tab.Button = TabButton;
 
         local Blocker = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
@@ -3715,6 +3940,35 @@ function Library:CreateWindow(...)
             ZIndex = 2;
             Parent = TabContainer;
         });
+
+        -- covers the tab while it fades in (see Tab:ShowTab)
+        local TabCover = Library:Create('Frame', {
+            Name = 'CentWuiTabFade';
+            BackgroundColor3 = Library.MainColor;
+            BackgroundTransparency = 1;
+            BorderSizePixel = 0;
+            Size = UDim2.new(1, 0, 1, 0);
+            Visible = false;
+            ZIndex = 40;
+            Parent = TabFrame;
+        });
+        TabCover:SetAttribute('CentWuiNoFade', true);
+        Library:ApplyCorner(TabCover, UDim.new(0, 8));
+        Library:AddToRegistry(TabCover, { BackgroundColor3 = 'MainColor' });
+
+        local TabTweens = {};
+        local function CancelTabTweens()
+            for _, Tw in next, TabTweens do
+                Tw:Cancel();
+            end;
+            table.clear(TabTweens);
+        end;
+        local function PlayTabTween(Obj, Time, Props)
+            local Tw = TweenService:Create(Obj, TweenInfo.new(Time, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), Props);
+            table.insert(TabTweens, Tw);
+            Tw:Play();
+            return Tw;
+        end;
 
         local LeftSide = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
@@ -3765,19 +4019,65 @@ function Library:CreateWindow(...)
         end;
 
         function Tab:ShowTab()
-            for _, Tab in next, Window.Tabs do
-                Tab:HideTab();
+            local Prev = Window.ActiveTab;
+
+            if Prev == Tab and TabFrame.Visible then
+                return;
             end;
 
+            local Animate = Library.TabAnimation and Prev ~= nil and Prev ~= Tab and Outer.Visible;
+            local Dir = 1; -- content slides in from the side of the tab you clicked
+
+            if Prev and Prev.Button then
+                Dir = (TabButton.AbsolutePosition.X >= Prev.Button.AbsolutePosition.X) and 1 or -1;
+            end;
+
+            for _, Other in next, Window.Tabs do
+                Other:HideTab(Animate);
+            end;
+
+            CancelTabTweens();
+            Window.ActiveTab = Tab;
             Blocker.BackgroundTransparency = 0;
-            TabButton.BackgroundColor3 = Color3.new(1, 1, 1);
             TabFrame.Visible = true;
+
+            if Animate then
+                local Time = Library.TabAnimationTime;
+
+                TabFrame.Position = UDim2.new(0, Dir * Library.TabSlideDistance, 0, 0);
+                TabCover.BackgroundTransparency = 0.1;
+                TabCover.Visible = true;
+
+                PlayTabTween(TabFrame, Time, { Position = UDim2.new(0, 0, 0, 0) });
+                PlayTabTween(TabButton, 0.2, { BackgroundColor3 = Color3.new(1, 1, 1) });
+
+                local Fade = PlayTabTween(TabCover, Time, { BackgroundTransparency = 1 });
+                Fade.Completed:Connect(function(State)
+                    if State == Enum.PlaybackState.Completed then
+                        TabCover.Visible = false;
+                    end;
+                end);
+            else
+                TabFrame.Position = UDim2.new(0, 0, 0, 0);
+                TabCover.Visible = false;
+                TabButton.BackgroundColor3 = Color3.new(1, 1, 1);
+            end;
+
+            Window:UpdateTabIndicator(TabButton, Animate);
         end;
 
-        function Tab:HideTab()
+        function Tab:HideTab(Animate)
+            CancelTabTweens();
             Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Color3.fromRGB(150, 150, 150);
             TabFrame.Visible = false;
+            TabFrame.Position = UDim2.new(0, 0, 0, 0);
+            TabCover.Visible = false;
+
+            if Animate then
+                PlayTabTween(TabButton, 0.2, { BackgroundColor3 = Color3.fromRGB(150, 150, 150) });
+            else
+                TabButton.BackgroundColor3 = Color3.fromRGB(150, 150, 150);
+            end;
         end;
 
         function Tab:SetLayoutOrder(Position)
@@ -3855,6 +4155,8 @@ function Library:CreateWindow(...)
                 SortOrder = Enum.SortOrder.LayoutOrder;
                 Parent = Container;
             });
+
+            Library:ApplyInnerGlow(BoxOuter, 8, 5);
 
             function Groupbox:Resize()
                 local Size = 0;
@@ -3946,6 +4248,8 @@ function Library:CreateWindow(...)
                 SortOrder = Enum.SortOrder.LayoutOrder;
                 Parent = TabboxButtons;
             });
+
+            Library:ApplyInnerGlow(BoxOuter, 0, 5);
 
             function Tabbox:AddTab(Name)
                 local Tab = {};
@@ -4085,6 +4389,15 @@ function Library:CreateWindow(...)
             return Tab:AddTabbox({ Name = Name, Side = 2; });
         end;
 
+        -- keep the underline in place when layout / window position changes
+        local function SyncIndicator()
+            if Window.ActiveTab == Tab then
+                Window:UpdateTabIndicator(TabButton, false);
+            end;
+        end;
+        TabButton:GetPropertyChangedSignal('AbsolutePosition'):Connect(SyncIndicator);
+        TabButton:GetPropertyChangedSignal('AbsoluteSize'):Connect(SyncIndicator);
+
         TabButton.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                 Tab:ShowTab();
@@ -4167,7 +4480,9 @@ function Library:CreateWindow(...)
         for _, Desc in next, Outer:GetDescendants() do
             local Properties = {};
 
-            if Desc:IsA('ImageLabel') then
+            if Desc:GetAttribute('CentWuiNoFade') then
+                -- animated helper objects (tab fade cover): never cache / fade them
+            elseif Desc:IsA('ImageLabel') then
                 local IsDecal = (Desc.Parent == DecalLayer) or Desc:GetAttribute('CentWuiDecal');
                 if not IsDecal then
                     table.insert(Properties, 'ImageTransparency');
@@ -4177,7 +4492,7 @@ function Library:CreateWindow(...)
                 table.insert(Properties, 'TextTransparency');
             elseif Desc:IsA('Frame') or Desc:IsA('ScrollingFrame') then
                 table.insert(Properties, 'BackgroundTransparency');
-            elseif Desc:IsA('UIStroke') then
+            elseif Desc:IsA('UIStroke') and not Desc:GetAttribute('CentWuiHover') then
                 table.insert(Properties, 'Transparency');
             end;
 
@@ -4191,6 +4506,10 @@ function Library:CreateWindow(...)
             for _, Prop in next, Properties do
                 if not Cache[Prop] then
                     Cache[Prop] = Desc[Prop];
+                end;
+
+                if Prop == 'Transparency' and Library.GlowStrokes[Desc] then
+                    Cache[Prop] = Library:GetGlowTransparency(Desc); -- follows SetGlowIntensity
                 end;
 
                 if Cache[Prop] == 1 then
